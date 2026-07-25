@@ -62,6 +62,9 @@ GameLoop:
 			continue
 		}
 		result := g.Guess(n)
+		if result != game.Correct && g.AttemptsRemaining() <= g.MaxAttempts/2 {
+			fmt.Println("Hint: the number is", g.Hint())
+		}
 		switch result {
 		case game.TooLow:
 			fmt.Println("Too low")

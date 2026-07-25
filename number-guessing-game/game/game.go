@@ -86,3 +86,10 @@ func (g *Game) AttemptsRemaining() int {
 func (g *Game) Elapsed() time.Duration {
 	return time.Since(g.StartTime)
 }
+
+func (g *Game) Hint() string {
+	if g.SecretNumber%2 == 0 {
+		return "even"
+	}
+	return "odd"
+}
