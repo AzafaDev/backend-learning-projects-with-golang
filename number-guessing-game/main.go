@@ -7,11 +7,31 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func main() {
-	var difficulty game.Difficulty
 	reader := bufio.NewReader(os.Stdin)
+	for {
+		playRound(reader)
+
+		fmt.Println("Play again? (y/n)")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("Error to read the input:", err)
+			os.Exit(1)
+		}
+		answer := strings.ToLower(strings.TrimSpace(input))
+		if answer != "y" && answer != "yes" {
+			fmt.Println("See you!")
+			break
+		}
+	}
+
+}
+
+func playRound(reader *bufio.Reader) {
+	var difficulty game.Difficulty
 	for {
 		fmt.Println("Choose difficulty level (easy/medium/hard): ")
 		input, err := reader.ReadString('\n')
@@ -49,10 +69,12 @@ GameLoop:
 			fmt.Println("Too High")
 		case game.Correct:
 			fmt.Printf("Correct! used %d attempts\n", g.AttemptsUsed)
+			fmt.Println("Duration of the playing:", g.Elapsed().Round(time.Second))
 			break GameLoop
 		}
 		if result != game.Correct && g.AttemptsRemaining() <= 0 {
 			fmt.Println("Attempts are out! the answer is", g.SecretNumber)
+			fmt.Println("Duration of the playing:", g.Elapsed().Round(time.Second))
 			break GameLoop
 		}
 

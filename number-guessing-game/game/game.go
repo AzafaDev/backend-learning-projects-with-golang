@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"time"
 )
 
 type Game struct {
@@ -11,6 +12,7 @@ type Game struct {
 	MaxAttempts  int
 	AttemptsUsed int
 	Difficulty   Difficulty
+	StartTime    time.Time
 }
 
 type Difficulty int
@@ -28,6 +30,20 @@ const (
 	TooHigh
 	Correct
 )
+
+func ParseDifficulty(s string) (Difficulty, error) {
+	input := strings.ToLower(strings.TrimSpace(s))
+	switch input {
+	case "easy":
+		return Easy, nil
+	case "medium":
+		return Medium, nil
+	case "hard":
+		return Hard, nil
+	default:
+		return 0, fmt.Errorf("unknown difficulty: %q", s)
+	}
+}
 
 func NewGame(difficulty Difficulty) *Game {
 	secretNumber := rand.Intn(100) + 1
@@ -47,6 +63,7 @@ func NewGame(difficulty Difficulty) *Game {
 		MaxAttempts:  maxAttempts,
 		AttemptsUsed: 0,
 		Difficulty:   difficulty,
+		StartTime:    time.Now(),
 	}
 }
 
@@ -66,16 +83,6 @@ func (g *Game) AttemptsRemaining() int {
 	return g.MaxAttempts - g.AttemptsUsed
 }
 
-func ParseDifficulty(s string) (Difficulty, error) {
-	input := strings.ToLower(strings.TrimSpace(s))
-	switch input {
-	case "easy":
-		return Easy, nil
-	case "medium":
-		return Medium, nil
-	case "hard":
-		return Hard, nil
-	default:
-		return 0, fmt.Errorf("unknown difficulty: %q", s)
-	}
+func (g *Game) Elapsed() time.Duration {
+	return time.Since(g.StartTime)
 }
