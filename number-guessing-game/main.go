@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"number-guessing-games/game"
+	"number-guessing-games/score"
 	"os"
 	"strconv"
 	"strings"
@@ -73,6 +74,24 @@ GameLoop:
 		case game.Correct:
 			fmt.Printf("Correct! used %d attempts\n", g.AttemptsUsed)
 			fmt.Println("Duration of the playing:", g.Elapsed().Round(time.Second))
+			h, err := score.Load()
+			if err != nil {
+				fmt.Println("Error:", err)
+				os.Exit(1)
+			}
+			if ok := h.UpdateIfBetter(g.Difficulty, g.AttemptsUsed); ok {
+				if err := score.Save(h); err != nil {
+					fmt.Println("Error:", err)
+					os.Exit(1)
+				}
+			}
+
+			fmt.Printf(`Your High Score
+Easy: %d,
+Medium: %d,
+Hard: %d
+			`, h.Easy, h.Medium, h.Hard)
+
 			break GameLoop
 		}
 		if result != game.Correct && g.AttemptsRemaining() <= 0 {
