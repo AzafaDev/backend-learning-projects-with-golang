@@ -10,7 +10,7 @@ var weightToGram = map[string]float64{
 	"pound":     453.592,
 }
 
-func ConvertWeight(value float64, to, from string) (float64, error) {
+func ConvertWeight(value float64, from, to string) (float64, error) {
 	fromFactor, ok1 := weightToGram[from]
 	toFactor, ok2 := weightToGram[to]
 	if !ok1 {
