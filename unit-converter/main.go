@@ -20,9 +20,14 @@ type Data struct {
 }
 
 func main() {
+	tmpl, err := template.ParseFiles("templates/index.html")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", homeHandler)
+	mux.HandleFunc("/", homeHandler(tmpl))
 
 	fmt.Println("server is running on port: 8080")
 	if err := http.ListenAndServe(":8080", mux); err != nil {
@@ -30,70 +35,101 @@ func main() {
 	}
 }
 
-func homeHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "POST" {
-		category := r.FormValue("category")
-		value, err := strconv.ParseFloat(r.FormValue("value"), 64)
-		if err != nil {
-			fmt.Fprintln(w, "error:", err)
-			return
-		}
-		from := r.FormValue("from")
-		to := r.FormValue("to")
-
-		switch category {
-		case "length":
-			result, err := converter.ConvertLength(value, from, to)
+func homeHandler(tmpl *template.Template) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			var data Data
+			category := r.FormValue("category")
+			value, err := strconv.ParseFloat(r.FormValue("value"), 64)
 			if err != nil {
+				data.Error = err.Error()
+				tmpl.Execute(w, data)
+				return
+			}
+			from := r.FormValue("from")
+			to := r.FormValue("to")
+
+			data.ActiveCategory = category
+
+			switch category {
+			case "length":
+				result, err := converter.ConvertLength(value, from, to)
+				data.Units = converter.LengthUnits()
+				data.Result = result
+				data.From = from
+				data.To = to
+				data.Value = value
+				if err != nil {
+					data.Error = err.Error()
+					tmpl.Execute(w, data)
+					return
+				}
+
+				if err := tmpl.Execute(w, data); err != nil {
+					fmt.Fprintln(w, "error", err)
+					return
+				}
+
+			case "weight":
+				result, err := converter.ConvertWeight(value, from, to)
+				data.Units = converter.WeightUnits()
+				data.Result = result
+				data.From = from
+				data.To = to
+				data.Value = value
+				if err != nil {
+					data.Error = err.Error()
+					tmpl.Execute(w, data)
+					return
+				}
+
+				if err := tmpl.Execute(w, data); err != nil {
+					fmt.Fprintln(w, "error", err)
+					return
+				}
+
+			case "temperature":
+				result, err := converter.ConvertTemperature(value, from, to)
+				data.Units = converter.TemperatureUnits()
+				data.Result = result
+				data.From = from
+				data.To = to
+				data.Value = value
+				if err != nil {
+					data.Error = err.Error()
+					tmpl.Execute(w, data)
+					return
+				}
+				if err := tmpl.Execute(w, data); err != nil {
+					fmt.Fprintln(w, "error", err)
+					return
+				}
+			}
+		}
+
+		if r.Method == "GET" {
+
+			category := r.URL.Query().Get("category")
+			if category == "" {
+				category = "length"
+			}
+
+			var data Data
+
+			data.ActiveCategory = category
+			switch category {
+			case "length":
+				data.Units = converter.LengthUnits()
+			case "weight":
+				data.Units = converter.WeightUnits()
+			case "temperature":
+				data.Units = converter.TemperatureUnits()
+			}
+
+			if err := tmpl.Execute(w, data); err != nil {
 				fmt.Fprintln(w, "error:", err)
 				return
 			}
-			fmt.Fprintln(w, "result:", result)
-
-		case "weight":
-			result, err := converter.ConvertWeight(value, from, to)
-			if err != nil {
-				fmt.Fprintln(w, "error:", err)
-				return
-			}
-			fmt.Fprintln(w, "result:", result)
-
-		case "temperature":
-			result, err := converter.ConvertTemperature(value, from, to)
-			if err != nil {
-				fmt.Fprintln(w, "error:", err)
-				return
-			}
-			fmt.Fprintln(w, "result:", result)
-		}
-	}
-
-	if r.Method == "GET" {
-		tmpl, err := template.ParseFiles("templates/index.html")
-		if err != nil {
-			fmt.Fprintln(w, "error:", err)
-			return
-		}
-		category := r.URL.Query().Get("category")
-		if category == "" {
-			category = "length"
-		}
-
-		var data Data
-
-		data.ActiveCategory = category
-		switch category {
-		case "length":
-			data.Units = converter.LengthUnits()
-		case "weight":
-			data.Units = converter.WeightUnits()
-		case "temperature":
-			data.Units = converter.TemperatureUnits()
-		}
-
-		if err := tmpl.Execute(w, data); err != nil {
-			fmt.Fprintln(w, "error:", err)
-			return
 		}
 	}
 
