@@ -51,60 +51,17 @@ func homeHandler(tmpl *template.Template) http.HandlerFunc {
 
 			data.ActiveCategory = category
 
-			switch category {
-			case "length":
-				result, err := converter.ConvertLength(value, from, to)
-				data.Units = converter.LengthUnits()
+			result, units, convertErr := convert(category, value, from, to)
+			data.Units = units
+			data.Value = value
+			data.From = from
+			data.To = to
+			if convertErr != nil {
+				data.Error = convertErr.Error()
+			} else {
 				data.Result = result
-				data.From = from
-				data.To = to
-				data.Value = value
-				if err != nil {
-					data.Error = err.Error()
-					tmpl.Execute(w, data)
-					return
-				}
-
-				if err := tmpl.Execute(w, data); err != nil {
-					fmt.Fprintln(w, "error", err)
-					return
-				}
-
-			case "weight":
-				result, err := converter.ConvertWeight(value, from, to)
-				data.Units = converter.WeightUnits()
-				data.Result = result
-				data.From = from
-				data.To = to
-				data.Value = value
-				if err != nil {
-					data.Error = err.Error()
-					tmpl.Execute(w, data)
-					return
-				}
-
-				if err := tmpl.Execute(w, data); err != nil {
-					fmt.Fprintln(w, "error", err)
-					return
-				}
-
-			case "temperature":
-				result, err := converter.ConvertTemperature(value, from, to)
-				data.Units = converter.TemperatureUnits()
-				data.Result = result
-				data.From = from
-				data.To = to
-				data.Value = value
-				if err != nil {
-					data.Error = err.Error()
-					tmpl.Execute(w, data)
-					return
-				}
-				if err := tmpl.Execute(w, data); err != nil {
-					fmt.Fprintln(w, "error", err)
-					return
-				}
 			}
+			tmpl.Execute(w, data)
 		}
 
 		if r.Method == "GET" {
@@ -133,4 +90,32 @@ func homeHandler(tmpl *template.Template) http.HandlerFunc {
 		}
 	}
 
+}
+
+func convert(category string, value float64, from, to string) (float64, []string, error) {
+	switch category {
+	case "length":
+		result, err := converter.ConvertLength(value, from, to)
+		if err != nil {
+			return 0, converter.LengthUnits(), err
+		}
+		return result, converter.LengthUnits(), nil
+
+	case "weight":
+		result, err := converter.ConvertWeight(value, from, to)
+		if err != nil {
+			return 0, converter.WeightUnits(), err
+		}
+		return result, converter.WeightUnits(), nil
+
+	case "temperature":
+		result, err := converter.ConvertTemperature(value, from, to)
+		if err != nil {
+			return 0, converter.TemperatureUnits(), err
+		}
+		return result, converter.TemperatureUnits(), nil
+
+	default:
+		return 0, converter.LengthUnits(), fmt.Errorf("kategori tidak dikenali: %s", category)
+	}
 }
