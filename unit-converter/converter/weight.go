@@ -1,6 +1,9 @@
 package converter
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 var weightToGram = map[string]float64{
 	"milligram": 0.001,
@@ -22,4 +25,13 @@ func ConvertWeight(value float64, from, to string) (float64, error) {
 	toGrams := fromFactor * value
 	result := toGrams / toFactor
 	return result, nil
+}
+
+func WeightUnits() []string {
+	var units []string
+	for key := range weightToGram {
+		units = append(units, key)
+	}
+	slices.Sort(units)
+	return units
 }

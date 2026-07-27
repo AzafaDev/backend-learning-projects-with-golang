@@ -1,6 +1,9 @@
 package converter
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 var lengthToMeter = map[string]float64{
 	"millimeter": 0.001,
@@ -26,4 +29,13 @@ func ConvertLength(value float64, from, to string) (float64, error) {
 	result := toMeters / toFactor
 
 	return result, nil
+}
+
+func LengthUnits() []string {
+	var units []string
+	for key, _ := range lengthToMeter {
+		units = append(units, key)
+	}
+	slices.Sort(units)
+	return units
 }

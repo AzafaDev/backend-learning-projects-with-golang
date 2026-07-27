@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"strconv"
@@ -67,7 +68,16 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "GET" {
-		
+		tmpl, err := template.ParseFiles("templates/index.html")
+		if err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
+		category := r.URL.Query().Get("category")
+		if category == "" {
+			category = "length"
+		}
+
 	}
 
 }

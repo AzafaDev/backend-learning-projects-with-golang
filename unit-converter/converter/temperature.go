@@ -40,4 +40,9 @@ func ConvertTemperature(value float64, from, to string) (float64, error) {
 	}
 
 	return result, nil
+
+}
+
+func TemperatureUnits() []string {
+	return []string{"celsius", "kelvin", "fahrenheit"}
 }
