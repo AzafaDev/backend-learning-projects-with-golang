@@ -11,6 +11,7 @@ import (
 
 type Data struct {
 	ActiveCategory string
+	Units          []string
 	Value          float64
 	From           string
 	To             string
@@ -78,6 +79,22 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 			category = "length"
 		}
 
+		var data Data
+
+		data.ActiveCategory = category
+		switch category {
+		case "length":
+			data.Units = converter.LengthUnits()
+		case "weight":
+			data.Units = converter.WeightUnits()
+		case "temperature":
+			data.Units = converter.TemperatureUnits()
+		}
+
+		if err := tmpl.Execute(w, data); err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
 	}
 
 }
