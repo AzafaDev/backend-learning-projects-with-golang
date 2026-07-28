@@ -37,7 +37,7 @@
     {{range .}}
     <tr>
       <td>{{.Title}}</td>
-      <td>{{.PublishedAt}}</td>
+      <td>{{.PublishedAt.Format "2006-01-02" }}</td>
       <td class="actions">
         <a class="edit-link" href="/admin/articles/{{.Slug}}/edit">Edit</a>
         <form class="delete-form" method="POST" action="/admin/articles/{{.Slug}}/delete">
