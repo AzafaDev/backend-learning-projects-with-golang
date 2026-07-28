@@ -2,14 +2,29 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
+	"personal-blog/article"
 )
 
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "GET /")
+		articles, err := article.LoadArticles("data")
+		if err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
+		tmpl, err := template.ParseFiles("templates/index.html")
+		if err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
+		if err := tmpl.Execute(w, articles); err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
 	})
 	mux.HandleFunc("GET /articles/{slug}", func(w http.ResponseWriter, r *http.Request) {
 		slug := r.PathValue("slug")
