@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"personal-blog/article"
+	"time"
 )
 
 const adminUsername = "Akmal"
@@ -75,6 +76,44 @@ func main() {
 			fmt.Fprintln(w, "error:", err)
 			return
 		}
+	}))
+
+	mux.HandleFunc("GET /admin/articles/new", requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		templ, err := template.ParseFiles("templates/new_article.html")
+		if err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
+		if err := templ.Execute(w, nil); err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
+	}))
+
+	mux.HandleFunc("POST /admin/articles/new", requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
+		title := r.FormValue("title")
+		content := r.FormValue("content")
+		publishedAt, err := time.Parse("2006-01-02", r.FormValue("published_at"))
+		if err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
+		slug := article.Slugify(title)
+		a := article.Article{
+			Title:       title,
+			Content:     content,
+			PublishedAt: publishedAt,
+			Slug:        slug,
+		}
+		if err := article.SaveArticle("data", a); err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 	}))
 
 	fmt.Println("server is running on port: 8080")

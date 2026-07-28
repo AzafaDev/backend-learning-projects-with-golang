@@ -2,6 +2,7 @@ package article
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,7 +10,6 @@ import (
 )
 
 type Article struct {
-	ID          int       `json:"id"`
 	Title       string    `json:"title"`
 	Content     string    `json:"content"`
 	Slug        string    `json:"slug"`
@@ -40,4 +40,53 @@ func LoadArticles(dir string) ([]Article, error) {
 		articles = append(articles, article)
 	}
 	return articles, nil
+}
+
+func SaveArticle(dir string, a Article) error {
+	ab, err := json.MarshalIndent(a, "", " ")
+	if err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		} else if e.Name() == a.Slug+".json" {
+			return fmt.Errorf("article is already exist")
+		} else {
+			continue
+		}
+	}
+	fileName := filepath.Join(dir, a.Slug)
+	if err := os.WriteFile(fileName+".json", ab, 0644); err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func Slugify(title string) string {
+	s := strings.ToLower(title)
+
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == ' ' || r == '-':
+			b.WriteRune('-')
+		}
+	}
+
+	slug := b.String()
+
+	for strings.Contains(slug, "--") {
+		slug = strings.ReplaceAll(slug, "--", "-")
+	}
+
+	return strings.Trim(slug, "-")
 }
