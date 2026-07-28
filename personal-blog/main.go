@@ -1,12 +1,16 @@
 package main
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"personal-blog/article"
 )
+
+const adminUsername = "Akmal"
+const adminPassword = "AkmalGantengBanget"
 
 func main() {
 	mux := http.NewServeMux()
@@ -56,13 +60,27 @@ func main() {
 			fmt.Fprintln(w, "not found 404")
 		}
 	})
-	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /admin", requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "GET /admin")
-	})
+	}))
 
 	fmt.Println("server is running on port: 8080")
 	if err := http.ListenAndServe(":8080", mux); err != nil {
 		log.Fatal("error:", err)
 	}
 
+}
+
+func requireAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		username, password, ok := r.BasicAuth()
+		same := subtle.ConstantTimeCompare([]byte(password), []byte(adminPassword))
+		if !ok || username != adminUsername || same != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="restricted"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprintln(w, "unauthorized")
+			return
+		}
+		next(w, r)
+	}
 }
