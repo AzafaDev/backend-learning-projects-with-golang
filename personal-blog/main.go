@@ -28,7 +28,33 @@ func main() {
 	})
 	mux.HandleFunc("GET /articles/{slug}", func(w http.ResponseWriter, r *http.Request) {
 		slug := r.PathValue("slug")
-		fmt.Fprintf(w, "GET /articles/%s\n", slug)
+		articles, err := article.LoadArticles("data")
+		if err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
+		found := false
+		for _, v := range articles {
+			if slug == v.Slug {
+				tmpl, err := template.ParseFiles("templates/article.html")
+				if err != nil {
+					fmt.Fprintln(w, "error:", err)
+					return
+				}
+				if err := tmpl.Execute(w, v); err != nil {
+					fmt.Fprintln(w, "error:", err)
+					return
+				}
+				found = true
+				break
+			} else {
+				continue
+			}
+		}
+		if found == false {
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprintln(w, "not found 404")
+		}
 	})
 	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "GET /admin")

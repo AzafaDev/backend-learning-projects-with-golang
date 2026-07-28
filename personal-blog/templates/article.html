@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My Blog</title>
+<style>
+  body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; color: #222; }
+  .back-link { display: inline-block; margin-bottom: 16px; color: #1a1aee; text-decoration: none; }
+  .back-link:hover { text-decoration: underline; }
+  .article-title { margin: 0 0 4px; }
+  .published-date { color: #666; font-size: 0.85rem; }
+  .article-content { margin-top: 24px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<a class="back-link" href="/">&larr; Back to home</a>
+
+<article>
+  <h1 class="article-title">{{.Title}}</h1>
+  <span class="published-date">Published: {{.PublishedAt.Format "2006-01-02" }}</span>
+  <p class="article-content">{{.Content}}</p>
+</article>
+
+</body>
+</html>
