@@ -61,7 +61,20 @@ func main() {
 		}
 	})
 	mux.HandleFunc("GET /admin", requireAuth(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "GET /admin")
+		articles, err := article.LoadArticles("data")
+		if err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
+		templ, err := template.ParseFiles("templates/admin.html")
+		if err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
+		if err := templ.Execute(w, articles); err != nil {
+			fmt.Fprintln(w, "error:", err)
+			return
+		}
 	}))
 
 	fmt.Println("server is running on port: 8080")
