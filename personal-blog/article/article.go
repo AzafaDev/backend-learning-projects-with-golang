@@ -2,7 +2,6 @@ package article
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,26 +46,12 @@ func SaveArticle(dir string, a Article) error {
 	if err != nil {
 		return err
 	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return err
-	}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		} else if e.Name() == a.Slug+".json" {
-			return fmt.Errorf("article is already exist")
-		} else {
-			continue
-		}
-	}
+
 	fileName := filepath.Join(dir, a.Slug)
 	if err := os.WriteFile(fileName+".json", ab, 0644); err != nil {
 		return err
 	}
-
 	return nil
-
 }
 
 func Slugify(title string) string {

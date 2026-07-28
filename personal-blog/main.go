@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
 	"personal-blog/article"
 	"time"
 )
@@ -18,16 +19,16 @@ func main() {
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		articles, err := article.LoadArticles("data")
 		if err != nil {
-			fmt.Fprintln(w, "error:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		tmpl, err := template.ParseFiles("templates/index.html")
 		if err != nil {
-			fmt.Fprintln(w, "error:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if err := tmpl.Execute(w, articles); err != nil {
-			fmt.Fprintln(w, "error:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	})
@@ -35,7 +36,7 @@ func main() {
 		slug := r.PathValue("slug")
 		articles, err := article.LoadArticles("data")
 		if err != nil {
-			fmt.Fprintln(w, "error:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		found := false
@@ -43,11 +44,11 @@ func main() {
 			if slug == v.Slug {
 				tmpl, err := template.ParseFiles("templates/article.html")
 				if err != nil {
-					fmt.Fprintln(w, "error:", err)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
 				if err := tmpl.Execute(w, v); err != nil {
-					fmt.Fprintln(w, "error:", err)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
 				found = true
@@ -64,16 +65,16 @@ func main() {
 	mux.HandleFunc("GET /admin", requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		articles, err := article.LoadArticles("data")
 		if err != nil {
-			fmt.Fprintln(w, "error:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		templ, err := template.ParseFiles("templates/admin.html")
 		if err != nil {
-			fmt.Fprintln(w, "error:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if err := templ.Execute(w, articles); err != nil {
-			fmt.Fprintln(w, "error:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}))
@@ -81,25 +82,25 @@ func main() {
 	mux.HandleFunc("GET /admin/articles/new", requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		templ, err := template.ParseFiles("templates/new_article.html")
 		if err != nil {
-			fmt.Fprintln(w, "error:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if err := templ.Execute(w, nil); err != nil {
-			fmt.Fprintln(w, "error:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}))
 
 	mux.HandleFunc("POST /admin/articles/new", requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			fmt.Fprintln(w, "error:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		title := r.FormValue("title")
 		content := r.FormValue("content")
 		publishedAt, err := time.Parse("2006-01-02", r.FormValue("published_at"))
 		if err != nil {
-			fmt.Fprintln(w, "error:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		slug := article.Slugify(title)
@@ -109,8 +110,100 @@ func main() {
 			PublishedAt: publishedAt,
 			Slug:        slug,
 		}
+		entries, err := os.ReadDir("data")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			} else if e.Name() == a.Slug+".json" {
+				http.Error(w, "error: slug is already exists", http.StatusConflict)
+				return
+			} else {
+				continue
+			}
+		}
 		if err := article.SaveArticle("data", a); err != nil {
-			fmt.Fprintln(w, "error:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	}))
+
+	mux.HandleFunc("GET /admin/articles/{slug}/edit", requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		slug := r.PathValue("slug")
+		templ, err := template.ParseFiles("templates/edit_article.html")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		articles, err := article.LoadArticles("data")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		found := false
+		var art article.Article
+		for _, a := range articles {
+			if a.Slug == slug {
+				found = true
+				art = a
+				break
+			} else {
+				continue
+			}
+		}
+		if !found {
+			http.Error(w, "error: not found", http.StatusNotFound)
+			return
+		}
+		if err := templ.Execute(w, art); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}))
+
+	mux.HandleFunc("POST /admin/articles/{slug}/edit", requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		slug := r.PathValue("slug")
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		title := r.FormValue("title")
+		content := r.FormValue("content")
+		publishedAt, err := time.Parse("2006-01-02", r.FormValue("published_at"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		a := article.Article{
+			Title:       title,
+			Content:     content,
+			PublishedAt: publishedAt,
+			Slug:        slug,
+		}
+		articles, err := article.LoadArticles("data")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		found := false
+		for _, a := range articles {
+			if a.Slug == slug {
+				found = true
+				break
+			} else {
+				continue
+			}
+		}
+		if !found {
+			http.Error(w, "error: not found", http.StatusNotFound)
+			return
+		}
+		if err := article.SaveArticle("data", a); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
