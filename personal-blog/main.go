@@ -99,9 +99,13 @@ func main() {
 		}
 		title := r.FormValue("title")
 		content := r.FormValue("content")
+		if err := article.ValidateArticleInput(&title, &content); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		publishedAt, err := time.Parse("2006-01-02", r.FormValue("published_at"))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		slug := article.Slugify(title)
@@ -174,9 +178,13 @@ func main() {
 		}
 		title := r.FormValue("title")
 		content := r.FormValue("content")
+		if err := article.ValidateArticleInput(&title, &content); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		publishedAt, err := time.Parse("2006-01-02", r.FormValue("published_at"))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		a := article.Article{

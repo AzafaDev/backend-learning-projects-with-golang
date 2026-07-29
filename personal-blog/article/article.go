@@ -69,6 +69,17 @@ func DeleteArticle(dir string, slug string) error {
 	return nil
 }
 
+func ValidateArticleInput(title, content *string) error {
+	*title = strings.TrimSpace(*title)
+	*content = strings.TrimSpace(*content)
+	if *title == "" {
+		return errors.New("title is required")
+	} else if *content == "" {
+		return errors.New("content is required")
+	}
+	return nil
+}
+
 func Slugify(title string) string {
 	s := strings.ToLower(title)
 
