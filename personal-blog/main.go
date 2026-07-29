@@ -2,13 +2,13 @@ package main
 
 import (
 	"crypto/subtle"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
 	"personal-blog/article"
-	"strings"
 	"time"
 )
 
@@ -213,9 +213,8 @@ func main() {
 	mux.HandleFunc("POST /admin/articles/{slug}/delete", requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		slug := r.PathValue("slug")
 		if err := article.DeleteArticle("data", slug); err != nil {
-			if strings.Contains(err.Error(), "not found") {
-				w.WriteHeader(http.StatusNotFound)
-				fmt.Fprintln(w, "article not found")
+			if errors.Is(err, article.ErrNotFound) {
+				http.Error(w, "article not found", http.StatusNotFound)
 				return
 			} else {
 				http.Error(w, err.Error(), http.StatusInternalServerError)

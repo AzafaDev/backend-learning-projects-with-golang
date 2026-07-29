@@ -55,11 +55,13 @@ func SaveArticle(dir string, a Article) error {
 	return nil
 }
 
+var ErrNotFound = errors.New("article not found")
+
 func DeleteArticle(dir string, slug string) error {
 	fileName := filepath.Join(dir, slug)
 	_, err := os.Stat(fileName + ".json")
 	if err != nil {
-		return errors.New("article not found")
+		return ErrNotFound
 	}
 	if err := os.Remove(fileName + ".json"); err != nil {
 		return err
