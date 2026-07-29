@@ -19,7 +19,11 @@ func main() {
 	if !ok {
 		log.Fatal("WEATHER_API_KEY is requried")
 	}
-	c := weather.NewClient(apiKey, "localhost:6379")
+	redisAddr, ok := os.LookupEnv("REDIS_ADDR")
+	if !ok {
+		log.Fatal("REDIS_ADDR is required")
+	}
+	c := weather.NewClient(apiKey, redisAddr)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /weather/{city}", func(w http.ResponseWriter, r *http.Request) {
 		city := r.PathValue("city")
