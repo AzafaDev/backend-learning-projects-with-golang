@@ -25,11 +25,13 @@ func main() {
 		city := r.PathValue("city")
 		resp, err := c.GetWeather(r.Context(), city)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("GetWeather failed for city=%q: %v", city, err)
+			http.Error(w, "failed to fetch weather data", http.StatusInternalServerError)
 			return
 		}
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("failed to encode response for city=%q: %v", city, err)
+			http.Error(w, "failed to encode response", http.StatusInternalServerError)
 			return
 		}
 	})
