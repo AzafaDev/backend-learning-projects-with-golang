@@ -19,11 +19,11 @@ func main() {
 	if !ok {
 		log.Fatal("WEATHER_API_KEY is requried")
 	}
-	c := weather.NewClient(apiKey)
+	c := weather.NewClient(apiKey, "localhost:6379")
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /weather/{city}", func(w http.ResponseWriter, r *http.Request) {
 		city := r.PathValue("city")
-		resp, err := c.GetWeather(city)
+		resp, err := c.GetWeather(r.Context(), city)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
