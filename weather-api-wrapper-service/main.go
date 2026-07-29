@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -45,9 +46,17 @@ func main() {
 		resp, err := c.GetWeather(r.Context(), city)
 		if err != nil {
 			log.Printf("GetWeather failed for city=%q: %v", city, err)
-			http.Error(w, "failed to fetch weather data", http.StatusInternalServerError)
+			switch {
+			case errors.Is(err, weather.ErrInvalidCity):
+				http.Error(w, "city not found", http.StatusNotFound)
+			case errors.Is(err, weather.ErrUpstreamUnavailable):
+				http.Error(w, "weather service temporarily unavailable", http.StatusBadGateway)
+			default:
+				http.Error(w, "failed to fetch weather data", http.StatusInternalServerError)
+			}
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			log.Printf("failed to encode response for city=%q: %v", city, err)
 			http.Error(w, "failed to encode response", http.StatusInternalServerError)
