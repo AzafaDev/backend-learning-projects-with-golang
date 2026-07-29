@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,8 +9,10 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"weather-api-service/weather"
 
@@ -35,6 +38,12 @@ func main() {
 		log.Fatal("REDIS_ADDR is required")
 	}
 	c := weather.NewClient(apiKey, redisAddr)
+	defer func() {
+		if err := c.Close(); err != nil {
+			log.Printf("failed to close weather client: %v", err)
+		}
+	}()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /weather/{city}", func(w http.ResponseWriter, r *http.Request) {
 		city := r.PathValue("city")
@@ -64,9 +73,31 @@ func main() {
 		}
 	})
 
-	fmt.Println("server is running on port: 8080")
-	if err := http.ListenAndServe(":8080", rateLimitMiddleware(mux)); err != nil {
-		log.Fatal(err)
+	srv := &http.Server{
+		Addr:              ":8080",
+		Handler:           rateLimitMiddleware(mux),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	go func() {
+		fmt.Println("server is running on port: 8080")
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("server failed: %v", err)
+		}
+	}()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	<-ctx.Done()
+
+	fmt.Println("shutting down server...")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("graceful shutdown failed: %v", err)
 	}
 }
 

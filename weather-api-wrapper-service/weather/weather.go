@@ -21,10 +21,10 @@ var (
 )
 
 type Client struct {
-	APIKey      string
-	BaseURL     string
-	HTTPClient  *http.Client
-	RedisClient *redis.Client
+	apiKey      string
+	baseURL     string
+	httpClient  *http.Client
+	redisClient *redis.Client
 }
 
 type vcResponse struct {
@@ -56,12 +56,12 @@ type Response struct {
 
 func NewClient(apiKey, addr string) *Client {
 	return &Client{
-		APIKey:  apiKey,
-		BaseURL: "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline",
-		HTTPClient: &http.Client{
+		apiKey:  apiKey,
+		baseURL: "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline",
+		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		RedisClient: redis.NewClient(
+		redisClient: redis.NewClient(
 			&redis.Options{
 				Addr: addr,
 			},
@@ -69,12 +69,17 @@ func NewClient(apiKey, addr string) *Client {
 	}
 }
 
+// Close releases the underlying Redis connection. Call it once on shutdown.
+func (c *Client) Close() error {
+	return c.redisClient.Close()
+}
+
 func (c *Client) GetWeather(ctx context.Context, city string) (Response, error) {
 	var vc vcResponse
 	var response Response
 	cacheKey := strings.ToLower(strings.TrimSpace(city))
 	cityParam := url.QueryEscape(cacheKey)
-	cached, err := c.RedisClient.Get(ctx, cacheKey).Result()
+	cached, err := c.redisClient.Get(ctx, cacheKey).Result()
 	if err == nil {
 		if err := json.Unmarshal([]byte(cached), &response); err != nil {
 			return Response{}, err
@@ -83,8 +88,12 @@ func (c *Client) GetWeather(ctx context.Context, city string) (Response, error) 
 		if !errors.Is(err, redis.Nil) {
 			log.Printf("redis lookup failed for %s, falling back to upstream API: %v", cacheKey, err)
 		}
-		reqUrl := fmt.Sprintf("%s/%s?key=%s&unitGroup=metric", c.BaseURL, cityParam, c.APIKey)
-		resp, err := c.HTTPClient.Get(reqUrl)
+		reqUrl := fmt.Sprintf("%s/%s?key=%s&unitGroup=metric", c.baseURL, cityParam, c.apiKey)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUrl, nil)
+		if err != nil {
+			return Response{}, err
+		}
+		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			return Response{}, fmt.Errorf("%w: %v", ErrUpstreamUnavailable, err)
 		}
@@ -112,7 +121,7 @@ func (c *Client) GetWeather(ctx context.Context, city string) (Response, error) 
 		if err != nil {
 			return Response{}, err
 		}
-		if err := c.RedisClient.Set(ctx, cacheKey, dataResp, 12*time.Hour).Err(); err != nil {
+		if err := c.redisClient.Set(ctx, cacheKey, dataResp, 12*time.Hour).Err(); err != nil {
 			log.Printf("failed to cache weather for %s: %v\n", cacheKey, err)
 		}
 	}
