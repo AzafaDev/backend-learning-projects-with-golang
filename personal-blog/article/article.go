@@ -2,6 +2,7 @@ package article
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,6 +50,18 @@ func SaveArticle(dir string, a Article) error {
 
 	fileName := filepath.Join(dir, a.Slug)
 	if err := os.WriteFile(fileName+".json", ab, 0644); err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeleteArticle(dir string, slug string) error {
+	fileName := filepath.Join(dir, slug)
+	_, err := os.Stat(fileName + ".json")
+	if err != nil {
+		return errors.New("article not found")
+	}
+	if err := os.Remove(fileName + ".json"); err != nil {
 		return err
 	}
 	return nil

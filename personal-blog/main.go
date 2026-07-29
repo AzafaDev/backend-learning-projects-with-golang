@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"personal-blog/article"
+	"strings"
 	"time"
 )
 
@@ -205,6 +206,21 @@ func main() {
 		if err := article.SaveArticle("data", a); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	}))
+
+	mux.HandleFunc("POST /admin/articles/{slug}/delete", requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		slug := r.PathValue("slug")
+		if err := article.DeleteArticle("data", slug); err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				w.WriteHeader(http.StatusNotFound)
+				fmt.Fprintln(w, "article not found")
+				return
+			} else {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 	}))
