@@ -5,7 +5,6 @@ import (
 	"blogging-platform-api/internal/database"
 	"blogging-platform-api/internal/post"
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -24,20 +23,21 @@ func main() {
 
 	pool, err := database.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("failed to connect db: %v ", err)
+		log.Fatalf("failed to connect db: %v", err)
 	}
 	defer pool.Close()
 
 	repo := post.NewRepository(pool)
-	post.NewService(repo)
+	service := post.NewService(repo)
+	handler := post.NewHandler(service)
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /posts", handler.CreatePost)
+	mux.HandleFunc("GET /posts/{id}", handler.GetByID)
+	mux.HandleFunc("PUT /posts/{id}", handler.UpdatePost)
+	mux.HandleFunc("DELETE /posts/{id}", handler.DeletePost)
+	mux.HandleFunc("GET /posts", handler.SearchPost)
 
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "ok!")
-	})
-
-	fmt.Println("server is running on port:", cfg.Port)
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
 		Handler: mux,
@@ -45,7 +45,7 @@ func main() {
 
 	go func() {
 		log.Printf("server running on: %s", cfg.Port)
-		if err := srv.ListenAndServe(); err != nil {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server error: %v", err)
 		}
 	}()
@@ -64,5 +64,4 @@ func main() {
 	}
 
 	log.Println("server exited")
-
 }

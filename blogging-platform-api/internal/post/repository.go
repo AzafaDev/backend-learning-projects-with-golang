@@ -78,7 +78,8 @@ func (r *Repository) UpdatePostByID(ctx context.Context, req UpdatePostRequest, 
 	SET title=$1,
 	content=$2,
 	category=$3,
-	tags=$4
+	tags=$4,
+	updated_at=now()
 	WHERE id=$5
 	RETURNING id, title, content, category, tags, created_at, updated_at
 	`
