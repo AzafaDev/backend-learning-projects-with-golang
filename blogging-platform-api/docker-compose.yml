@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: blogging-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bloguser
+      POSTGRES_PASSWORD: blogpass
+      POSTGRES_DB: blogdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bloguser -d blogdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    image: migrate/migrate:v4.17.1
+    container_name: blogging-migrate
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    command:
+      [
+        "-path", "/migrations",
+        "-database", "postgres://bloguser:blogpass@db:5432/blogdb?sslmode=disable",
+        "up"
+      ]
+    restart: on-failure
+
+  api:
+    build: .
+    container_name: blogging-api
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://bloguser:blogpass@db:5432/blogdb?sslmode=disable
+    restart: unless-stopped
+
+volumes:
+  db_data:
