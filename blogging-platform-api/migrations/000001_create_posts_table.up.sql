@@ -5,5 +5,5 @@ CREATE TABLE IF NOT EXISTS posts (
     category VARCHAR(100) NOT NULL,
     tags TEXT [] DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
