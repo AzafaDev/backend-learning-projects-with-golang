@@ -33,4 +33,5 @@ type UpdatePostRequest struct {
 
 var (
 	ErrPostNotFound = errors.New("post not found")
+	ErrBadRequest   = errors.New("title, content and category are required")
 )

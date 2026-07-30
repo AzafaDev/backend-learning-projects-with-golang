@@ -28,7 +28,8 @@ func main() {
 	}
 	defer pool.Close()
 
-	post.NewRepository(pool)
+	repo := post.NewRepository(pool)
+	post.NewService(repo)
 
 	mux := http.NewServeMux()
 
