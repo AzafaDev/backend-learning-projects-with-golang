@@ -3,6 +3,7 @@ package main
 import (
 	"blogging-platform-api/internal/config"
 	"blogging-platform-api/internal/database"
+	"blogging-platform-api/internal/post"
 	"context"
 	"fmt"
 	"log"
@@ -26,6 +27,8 @@ func main() {
 		log.Fatalf("failed to connect db: %v ", err)
 	}
 	defer pool.Close()
+
+	post.NewRepository(pool)
 
 	mux := http.NewServeMux()
 

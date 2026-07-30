@@ -1,6 +1,7 @@
 package post
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,3 +30,7 @@ type UpdatePostRequest struct {
 	Category string   `json:"category" validate:"required"`
 	Tags     []string `json:"tags"`
 }
+
+var (
+	ErrPostNotFound = errors.New("post not found")
+)
