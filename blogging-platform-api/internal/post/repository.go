@@ -6,14 +6,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Repository struct {
-	pool *pgxpool.Pool
+type PgxPool interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
 
-func NewRepository(pool *pgxpool.Pool) *Repository {
+type Repository struct {
+	pool PgxPool
+}
+
+func NewRepository(pool PgxPool) *Repository {
 	return &Repository{
 		pool: pool,
 	}
