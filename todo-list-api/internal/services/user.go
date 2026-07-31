@@ -2,9 +2,11 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 	"todo-list-api/internal/config"
+	"todo-list-api/internal/database"
 	"todo-list-api/internal/models"
 	"todo-list-api/internal/repository"
 
@@ -28,52 +30,54 @@ func NewUserService(repo *repository.UserRepository, cfg *config.Config) *UserSe
 	}
 }
 
-func (u *UserService) Register(ctx context.Context, req models.RegisterRequest) (string, error) {
-	if err := u.validator.Struct(req); err != nil {
-		log.Error().Err(err)
+func (s *UserService) Register(ctx context.Context, req models.RegisterRequest) (string, error) {
+	if err := s.validator.Struct(req); err != nil {
+		log.Error().Err(err).Msg("register: validation failed")
 		return "", fmt.Errorf("name, email and password are required")
 	}
-	existingUser, err := u.repo.GetUserByEmail(ctx, req.Email)
+	existingUser, err := s.repo.GetUserByEmail(ctx, req.Email)
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
+		return "", fmt.Errorf("register: %w", err)
+	}
 	if existingUser != nil {
 		return "", fmt.Errorf("email is already exists")
-	} else if err != nil {
-		return "", err
 	}
 	passwordHash, err := hashPassword(req.Password)
 	if err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("register: failed to hash password")
 		return "", fmt.Errorf("something went wrong")
 	}
-	createdUser, err := u.repo.CreateUser(ctx, req.Name, req.Email, passwordHash)
+	createdUser, err := s.repo.CreateUser(ctx, req.Name, req.Email, passwordHash)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("register: %w", err)
 	}
-	signedToken, err := generateToken(createdUser.Name, createdUser.Email, u.cfg.JwtSecretKey)
+	signedToken, err := generateToken(createdUser.Name, createdUser.Email, s.cfg.JwtSecretKey)
 	if err != nil {
-		log.Error().Err(err)
-		return "", err
+		log.Error().Err(err).Msg("register: failed to generate token")
+		return "", fmt.Errorf("something went wrong")
 	}
 	return signedToken, nil
 }
 
-func (u *UserService) Login(ctx context.Context, req models.LoginRequest) (string, error) {
-	if err := u.validator.Struct(req); err != nil {
-		log.Error().Err(err)
-		return "", err
-	}
-	existingUser, err := u.repo.GetUserByEmail(ctx, req.Email)
-	if existingUser == nil || err != nil {
-		log.Error().Err(err)
+func (s *UserService) Login(ctx context.Context, req models.LoginRequest) (string, error) {
+	if err := s.validator.Struct(req); err != nil {
+		log.Error().Err(err).Msg("login: validation failed")
 		return "", fmt.Errorf("invalid email or password")
 	}
-	if matchingPassword := comparePassword(existingUser.PasswordHash, req.Password); !matchingPassword {
-		log.Error().Err(err)
-		return "", fmt.Errorf("invalid email or password")
-	}
-	signedToken, err := generateToken(existingUser.Name, existingUser.Email, u.cfg.JwtSecretKey)
+	existingUser, err := s.repo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		log.Error().Err(err)
-		return "", err
+		if !errors.Is(err, database.ErrNotFound) {
+			log.Error().Err(err).Msg("login: failed to fetch user")
+		}
+		return "", fmt.Errorf("invalid email or password")
+	}
+	if !comparePassword(existingUser.PasswordHash, req.Password) {
+		return "", fmt.Errorf("invalid email or password")
+	}
+	signedToken, err := generateToken(existingUser.Name, existingUser.Email, s.cfg.JwtSecretKey)
+	if err != nil {
+		log.Error().Err(err).Msg("login: failed to generate token")
+		return "", fmt.Errorf("something went wrong")
 	}
 	return signedToken, nil
 }
@@ -103,9 +107,9 @@ func generateToken(name, email, jwtSecretKey string) (string, error) {
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	signedToken, err := token.SignedString(jwtSecretKey)
+	signedToken, err := token.SignedString([]byte(jwtSecretKey))
 	if err != nil {
 		return "", err
 	}
@@ -114,11 +118,11 @@ func generateToken(name, email, jwtSecretKey string) (string, error) {
 }
 
 func validateToken(tokenString, secretKey string) (*models.UserClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, models.UserClaims{}, func(t *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &models.UserClaims{}, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("algorithm method does not match")
 		}
-		return secretKey, nil
+		return []byte(secretKey), nil
 	})
 	if err != nil {
 		return nil, err

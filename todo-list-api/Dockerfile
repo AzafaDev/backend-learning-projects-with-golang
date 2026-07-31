@@ -1,6 +1,6 @@
 # ---- Stage 1: build ----
 # Pakai image Go lengkap cuma buat compile, gak akan ikut ke image final.
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 WORKDIR /app
 
 # Copy go.mod & go.sum dulu (terpisah dari source code) supaya layer ini

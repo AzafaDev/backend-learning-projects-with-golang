@@ -1,11 +1,12 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"todo-list-api/internal/models"
 	"todo-list-api/internal/services"
+
+	"github.com/rs/zerolog/log"
 )
 
 type UserHandler struct {
@@ -18,46 +19,43 @@ func NewUserHandler(srv *services.UserService) *UserHandler {
 	}
 }
 
-func (u *UserHandler) Login(w http.ResponseWriter, r *http.Request, ctx context.Context) {
-	var req models.LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		http.Error(w, "invalid or email password", http.StatusBadRequest)
-		return
-	}
-	tokenString, err := u.srv.Login(ctx, req)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		http.Error(w, "invalid or email password", http.StatusBadRequest)
-		return
-	}
-
+func writeJSONError(w http.ResponseWriter, message string, status int) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(tokenString); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		http.Error(w, "invalid or email password", http.StatusBadRequest)
-		return
-	}
+	http.Error(w, message, status)
 }
 
-func (u *UserHandler) Register(w http.ResponseWriter, r *http.Request, ctx context.Context) {
-	var req models.RegisterRequest
+func writeJSON(w http.ResponseWriter, body any) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(body)
+}
+
+func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
+	var req models.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		http.Error(w, "name, email and password are required", http.StatusBadRequest)
+		writeJSONError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	tokenString, err := u.srv.Register(ctx, req)
+	tokenString, err := h.srv.Login(r.Context(), req)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeJSONError(w, "invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(tokenString); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	writeJSON(w, map[string]string{"token": tokenString})
+}
+
+func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
+	var req models.RegisterRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
+	tokenString, err := h.srv.Register(r.Context(), req)
+	if err != nil {
+		log.Error().Err(err).Msg("register failed")
+		writeJSONError(w, "unable to register user", http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(w, map[string]string{"token": tokenString})
 }

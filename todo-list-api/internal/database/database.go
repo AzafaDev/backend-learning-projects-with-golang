@@ -24,5 +24,5 @@ func ConnectDB(ctx context.Context, dbUrl string) (*pgxpool.Pool, error) {
 	if err := pool.Ping(ctx); err != nil {
 		return nil, err
 	}
-return pool, nil
+	return pool, nil
 }

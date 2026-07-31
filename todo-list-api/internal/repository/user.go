@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"todo-list-api/internal/database"
 	"todo-list-api/internal/models"
 
@@ -21,33 +21,47 @@ func NewUserRepository(db *pgxpool.Pool) *UserRepository {
 	}
 }
 
-func (u *UserRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	var user models.User
 	query := `
 	SELECT id, name, email, password_hash, created_at, updated_at
 	FROM users
 	WHERE email=$1
 	`
-	if err := u.DB.QueryRow(ctx, query, email).Scan(&user); err != nil {
+	err := r.DB.QueryRow(ctx, query, email).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.PasswordHash,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			log.Println(err)
-			return nil, database.ErrNotFound("user with email: " + email)
+			return nil, database.ErrNotFound
 		}
-		return nil, err
+		return nil, fmt.Errorf("get user by email: %w", err)
 	}
 	return &user, nil
 }
 
-func (u *UserRepository) CreateUser(ctx context.Context, name, email, passwordHash string) (*models.User, error) {
+func (r *UserRepository) CreateUser(ctx context.Context, name, email, passwordHash string) (*models.User, error) {
 	var user models.User
 	query := `
 	INSERT INTO users (name, email, password_hash)
 	VALUES ($1, $2, $3)
-	RETURNING *
+	RETURNING id, name, email, password_hash, created_at, updated_at
 	`
-	if err := u.DB.QueryRow(ctx, query, email).Scan(&user); err != nil {
-		log.Println(err)
-		return nil, err
+	err := r.DB.QueryRow(ctx, query, name, email, passwordHash).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.PasswordHash,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create user: %w", err)
 	}
 	return &user, nil
 }

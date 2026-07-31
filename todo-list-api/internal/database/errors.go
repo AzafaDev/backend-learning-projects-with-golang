@@ -1,9 +1,5 @@
 package database
 
-import (
-	"fmt"
-)
+import "errors"
 
-func ErrNotFound(data any) error {
-	return fmt.Errorf("%v not found", data)
-}
+var ErrNotFound = errors.New("not found")
