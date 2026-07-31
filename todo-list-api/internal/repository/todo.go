@@ -45,14 +45,14 @@ func (t *TodoRepository) GetTodoByID(ctx context.Context, id uuid.UUID) (*models
 	return &todo, nil
 }
 
-func (t *TodoRepository) CreateTodo(ctx context.Context, req models.CreateTodoRequest) (*models.Todo, error) {
+func (t *TodoRepository) CreateTodo(ctx context.Context, req models.CreateTodoRequest, userID uuid.UUID) (*models.Todo, error) {
 	var todo models.Todo
 	query := `
-	INSERT INTO users (title, description)
-	VALUES ($1, $2)
+	INSERT INTO users (title, description, user_id)
+	VALUES ($1, $2, $3)
 	RETURNING id, user_id, title, description, created_at, updated_at
 	`
-	if err := t.Db.QueryRow(ctx, query, req.Title, req.Description).Scan(
+	if err := t.Db.QueryRow(ctx, query, req.Title, req.Description, userID).Scan(
 		&todo.ID,
 		&todo.UserID,
 		&todo.Title,
@@ -73,9 +73,10 @@ func (t *TodoRepository) UpdateTodo(ctx context.Context, req models.UpdateTodoRe
 	SET title=$1
 		description=$2
 		updated_at=now()
+	WHERE id=$3
 	RETURNING id, user_id, title, description, created_at, updated_at
 	`
-	if err := t.Db.QueryRow(ctx, query, req.Title, req.Description).Scan(
+	if err := t.Db.QueryRow(ctx, query, req.Title, req.Description, id).Scan(
 		&todo.ID,
 		&todo.UserID,
 		&todo.Title,
