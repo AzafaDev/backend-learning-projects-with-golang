@@ -2,17 +2,18 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"todo-list-api/internal/config"
 	"todo-list-api/internal/services"
 	"todo-list-api/internal/utils"
+
+	"github.com/google/uuid"
 )
 
 type contextKey string
 
-const userIDKey = "userID"
+const UserIDKey contextKey = "userID"
 
 func AuthMiddleware(next http.Handler, cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -21,12 +22,7 @@ func AuthMiddleware(next http.Handler, cfg config.Config) http.Handler {
 		if authHeader == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			if err := json.NewEncoder(w).Encode(map[string]string{
-				"message": "Unauthorized",
-			}); err != nil {
-				http.Error(w, "something went wrong", http.StatusInternalServerError)
-				return
-			}
+			utils.WriteJSONError(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		tokenString := authHeader
@@ -40,9 +36,17 @@ func AuthMiddleware(next http.Handler, cfg config.Config) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), userIDKey, userClaims.ID)
+		ctx := context.WithValue(r.Context(), UserIDKey, userClaims.ID)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 
 	})
+}
+
+func GetUserID(ctx context.Context) (uuid.UUID, bool) {
+	userID, ok := ctx.Value(UserIDKey).(uuid.UUID)
+	if !ok {
+		return uuid.Nil, false
+	}
+	return userID, true
 }

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"todo-list-api/internal/database"
 	"todo-list-api/internal/models"
 
@@ -39,7 +40,7 @@ func (t *TodoRepository) GetTodoByID(ctx context.Context, id uuid.UUID) (*models
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, database.ErrNotFound
 		}
-		return nil, err
+		return nil, fmt.Errorf("get todo by id: %v", err)
 	}
 
 	return &todo, nil
@@ -60,7 +61,7 @@ func (t *TodoRepository) CreateTodo(ctx context.Context, req models.CreateTodoRe
 		&todo.CreatedAt,
 		&todo.UpdatedAt,
 	); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create todo: %v", err)
 	}
 
 	return &todo, nil
@@ -88,7 +89,7 @@ func (t *TodoRepository) UpdateTodo(ctx context.Context, req models.UpdateTodoRe
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, database.ErrNotFound
 		}
-		return nil, err
+		return nil, fmt.Errorf("update todo: %v", err)
 	}
 
 	return &todo, nil
@@ -113,7 +114,7 @@ func (t *TodoRepository) DeleteTodo(ctx context.Context, id, userID uuid.UUID) (
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, database.ErrNotFound
 		}
-		return nil, err
+		return nil, fmt.Errorf("delete todo: %v", err)
 	}
 
 	return &todo, nil
@@ -131,7 +132,7 @@ func (t *TodoRepository) GetTodosByUserID(ctx context.Context, userID uuid.UUID,
 
 	rows, err := t.Db.Query(ctx, query, userID, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get todos: %v", err)
 	}
 	defer rows.Close()
 
@@ -145,13 +146,13 @@ func (t *TodoRepository) GetTodosByUserID(ctx context.Context, userID uuid.UUID,
 			&todo.CreatedAt,
 			&todo.UpdatedAt,
 		); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("get todos: %v", err)
 		}
 		todos = append(todos, todo)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get todos: %v", err)
 	}
 
 	if todos == nil {
@@ -164,7 +165,7 @@ func (t *TodoRepository) CountTodosByUserID(ctx context.Context, userID uuid.UUI
 	var count int
 	query := `SELECT COUNT(*) FROM todos WHERE user_id=$1`
 	if err := t.Db.QueryRow(ctx, query, userID).Scan(&count); err != nil {
-		return 0, err
+		return 0,  fmt.Errorf("count todos: %v", err)
 	}
 	return count, nil
 }

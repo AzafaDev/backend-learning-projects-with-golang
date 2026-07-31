@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"todo-list-api/internal/database"
+	"todo-list-api/internal/middleware"
 	"todo-list-api/internal/models"
 	"todo-list-api/internal/services"
 	"todo-list-api/internal/utils"
@@ -36,7 +37,7 @@ func NewTodoHandler(srv *services.TodoService) *TodoHandler {
 
 func (t *TodoHandler) CreateTodos(w http.ResponseWriter, r *http.Request) {
 	var req models.CreateTodoRequest
-	userID, ok := r.Context().Value("userID").(uuid.UUID)
+	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
 		utils.WriteJSONError(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -62,7 +63,7 @@ func (t *TodoHandler) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 		utils.WriteJSONError(w, "id is invalid", http.StatusBadRequest)
 		return
 	}
-	userID, ok := r.Context().Value("userID").(uuid.UUID)
+	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
 		utils.WriteJSONError(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -87,7 +88,7 @@ func (t *TodoHandler) DeleteTodo(w http.ResponseWriter, r *http.Request) {
 		utils.WriteJSONError(w, "id is invalid", http.StatusBadRequest)
 		return
 	}
-	userID, ok := r.Context().Value("userID").(uuid.UUID)
+	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
 		utils.WriteJSONError(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -102,7 +103,7 @@ func (t *TodoHandler) DeleteTodo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *TodoHandler) GetTodos(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value("userID").(uuid.UUID)
+	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
 		utils.WriteJSONError(w, "unauthorized", http.StatusUnauthorized)
 		return
