@@ -7,7 +7,8 @@ import (
 
 func WriteJSONError(w http.ResponseWriter, message string, status int) {
 	w.Header().Set("Content-Type", "application/json")
-	http.Error(w, message, status)
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"message": message})
 }
 
 func WriteJSON(w http.ResponseWriter, body any, status int) {

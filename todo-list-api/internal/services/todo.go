@@ -81,3 +81,7 @@ func (t *TodoService) DeleteTodo(ctx context.Context, id, userID uuid.UUID) (*mo
 	}
 	return t.Repo.DeleteTodo(ctx, id, userID)
 }
+
+func (t *TodoService) GetTodoByID(ctx context.Context, id, userID uuid.UUID) (*models.Todo, error) {
+	return t.Repo.GetTodoByID(ctx, id)
+}

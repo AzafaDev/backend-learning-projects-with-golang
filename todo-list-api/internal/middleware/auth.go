@@ -10,6 +10,10 @@ import (
 	"todo-list-api/internal/utils"
 )
 
+type contextKey string
+
+const userIDKey = "userID"
+
 func AuthMiddleware(next http.Handler, cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -36,7 +40,7 @@ func AuthMiddleware(next http.Handler, cfg config.Config) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), "userID", userClaims.ID)
+		ctx := context.WithValue(r.Context(), userIDKey, userClaims.ID)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 
