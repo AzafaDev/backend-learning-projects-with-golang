@@ -11,6 +11,7 @@ import (
 	"todo-list-api/internal/config"
 	"todo-list-api/internal/database"
 	"todo-list-api/internal/handlers"
+	"todo-list-api/internal/middleware"
 	"todo-list-api/internal/repository"
 	"todo-list-api/internal/services"
 
@@ -36,9 +37,18 @@ func main() {
 	userService := services.NewUserService(userRepo, cfg)
 	userHandler := handlers.NewUserHandler(userService)
 
+	todoRepo := repository.NewTodoRepository(db)
+	todoService := services.NewTodoService(todoRepo)
+	todoHandler := handlers.NewTodoHandler(todoService)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /register", userHandler.Register)
 	mux.HandleFunc("POST /login", userHandler.Login)
+
+	mux.Handle("POST /todos", middleware.AuthMiddleware(http.HandlerFunc(todoHandler.CreateTodos), *cfg))
+	mux.Handle("PUT /todos/{id}", middleware.AuthMiddleware(http.HandlerFunc(todoHandler.UpdateTodo), *cfg))
+	mux.Handle("DELETE /todos/{id}", middleware.AuthMiddleware(http.HandlerFunc(todoHandler.DeleteTodo), *cfg))
+	mux.Handle("GET /todos", middleware.AuthMiddleware(http.HandlerFunc(todoHandler.GetTodos), *cfg))
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

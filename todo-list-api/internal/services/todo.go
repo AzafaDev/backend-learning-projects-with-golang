@@ -33,13 +33,13 @@ func (t *TodoService) CreateTodo(ctx context.Context, req models.CreateTodoReque
 	return t.Repo.CreateTodo(ctx, req, userID)
 }
 
-func (t *TodoService) UpdateTodo(ctx context.Context, req models.UpdateTodoRequest, id uuid.UUID) (*models.Todo, error) {
+func (t *TodoService) UpdateTodo(ctx context.Context, req models.UpdateTodoRequest, id, userID uuid.UUID) (*models.Todo, error) {
 	if err := t.validator.Struct(req); err != nil {
 		return nil, errors.New("title and description are required")
 	}
-	return t.Repo.UpdateTodo(ctx, req, id)
+	return t.Repo.UpdateTodo(ctx, req, id, userID)
 }
 
-func (t *TodoService) DeleteTodo(ctx context.Context, id uuid.UUID) (*models.Todo, error) {
-	return t.Repo.DeleteTodo(ctx, id)
+func (t *TodoService) DeleteTodo(ctx context.Context, id, userID uuid.UUID) (*models.Todo, error) {
+	return t.Repo.DeleteTodo(ctx, id, userID)
 }

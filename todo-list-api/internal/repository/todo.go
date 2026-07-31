@@ -66,7 +66,7 @@ func (t *TodoRepository) CreateTodo(ctx context.Context, req models.CreateTodoRe
 	return &todo, nil
 }
 
-func (t *TodoRepository) UpdateTodo(ctx context.Context, req models.UpdateTodoRequest, id uuid.UUID) (*models.Todo, error) {
+func (t *TodoRepository) UpdateTodo(ctx context.Context, req models.UpdateTodoRequest, id, userID uuid.UUID) (*models.Todo, error) {
 	var todo models.Todo
 	query := `
 	UPDATE todos
@@ -74,9 +74,10 @@ func (t *TodoRepository) UpdateTodo(ctx context.Context, req models.UpdateTodoRe
 		description=$2
 		updated_at=now()
 	WHERE id=$3
+	AND user_id=$4
 	RETURNING id, user_id, title, description, created_at, updated_at
 	`
-	if err := t.Db.QueryRow(ctx, query, req.Title, req.Description, id).Scan(
+	if err := t.Db.QueryRow(ctx, query, req.Title, req.Description, id, userID).Scan(
 		&todo.ID,
 		&todo.UserID,
 		&todo.Title,
@@ -93,14 +94,15 @@ func (t *TodoRepository) UpdateTodo(ctx context.Context, req models.UpdateTodoRe
 	return &todo, nil
 }
 
-func (t *TodoRepository) DeleteTodo(ctx context.Context, id uuid.UUID) (*models.Todo, error) {
+func (t *TodoRepository) DeleteTodo(ctx context.Context, id, userID uuid.UUID) (*models.Todo, error) {
 	var todo models.Todo
 	query := `
 	DELETE todos
 	WHERE id=$1
+	AND user_id=$2
 	RETURNING id, user_id, title, description, created_at, updated_at
 	`
-	if err := t.Db.QueryRow(ctx, query, id).Scan(
+	if err := t.Db.QueryRow(ctx, query, id, userID).Scan(
 		&todo.ID,
 		&todo.UserID,
 		&todo.Title,

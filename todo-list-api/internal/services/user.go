@@ -119,7 +119,7 @@ func generateToken(id uuid.UUID, name, email, jwtSecretKey string) (string, erro
 	return signedToken, nil
 }
 
-func validateToken(tokenString, secretKey string) (*models.UserClaims, error) {
+func ValidateToken(tokenString, secretKey string) (*models.UserClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &models.UserClaims{}, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("algorithm method does not match")
