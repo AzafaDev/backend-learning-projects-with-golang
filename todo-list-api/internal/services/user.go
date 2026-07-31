@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -51,7 +52,7 @@ func (s *UserService) Register(ctx context.Context, req models.RegisterRequest) 
 	if err != nil {
 		return "", fmt.Errorf("register: %w", err)
 	}
-	signedToken, err := generateToken(createdUser.Name, createdUser.Email, s.cfg.JwtSecretKey)
+	signedToken, err := generateToken(createdUser.ID, createdUser.Name, createdUser.Email, s.cfg.JwtSecretKey)
 	if err != nil {
 		log.Error().Err(err).Msg("register: failed to generate token")
 		return "", fmt.Errorf("something went wrong")
@@ -74,7 +75,7 @@ func (s *UserService) Login(ctx context.Context, req models.LoginRequest) (strin
 	if !comparePassword(existingUser.PasswordHash, req.Password) {
 		return "", fmt.Errorf("invalid email or password")
 	}
-	signedToken, err := generateToken(existingUser.Name, existingUser.Email, s.cfg.JwtSecretKey)
+	signedToken, err := generateToken(existingUser.ID, existingUser.Name, existingUser.Email, s.cfg.JwtSecretKey)
 	if err != nil {
 		log.Error().Err(err).Msg("login: failed to generate token")
 		return "", fmt.Errorf("something went wrong")
@@ -97,8 +98,9 @@ func comparePassword(hash, password string) bool {
 	return true
 }
 
-func generateToken(name, email, jwtSecretKey string) (string, error) {
+func generateToken(id uuid.UUID, name, email, jwtSecretKey string) (string, error) {
 	claims := models.UserClaims{
+		ID:       id,
 		Username: name,
 		Email:    email,
 		RegisteredClaims: jwt.RegisteredClaims{
