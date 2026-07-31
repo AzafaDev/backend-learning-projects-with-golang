@@ -8,8 +8,9 @@ import (
 )
 
 type Config struct {
-	Port        string
-	DatabaseURL string
+	Port         string
+	DatabaseURL  string
+	JwtSecretKey string
 }
 
 func NewConfig() (*Config, error) {
@@ -18,12 +19,17 @@ func NewConfig() (*Config, error) {
 	}
 	port := getEnv("PORT", "8080")
 	dbUrl := os.Getenv("DATABASE_URL")
+	jwtSecret := os.Getenv("JWT_SECRET_KEY")
 	if dbUrl == "" {
 		return nil, errors.New("DATABASE_URL is required")
 	}
+	if jwtSecret == "" {
+		return nil, errors.New("JWT_SECRET_KEY is required")
+	}
 	return &Config{
-		Port:        port,
-		DatabaseURL: dbUrl,
+		Port:         port,
+		DatabaseURL:  dbUrl,
+		JwtSecretKey: jwtSecret,
 	}, nil
 }
 
