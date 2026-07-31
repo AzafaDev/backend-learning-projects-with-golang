@@ -24,3 +24,10 @@ type UpdateTodoRequest struct {
 	Title       string `json:"title" validate:"required"`
 	Description string `json:"description" validate:"required"`
 }
+
+type PaginatedTodos struct {
+	Data  []Todo `json:"data"`
+	Total int    `json:"total"`
+	Page  int    `json:"page"`
+	Limit int    `json:"limit"`
+}
