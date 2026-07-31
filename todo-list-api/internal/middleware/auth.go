@@ -14,20 +14,18 @@ import (
 type contextKey string
 
 const UserIDKey contextKey = "userID"
+const bearerPrefix = "Bearer "
 
 func AuthMiddleware(next http.Handler, cfg config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
 			utils.WriteJSONError(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		tokenString := authHeader
 		if ok := strings.HasPrefix(authHeader, "Bearer"); ok {
-			tokenString = strings.TrimPrefix(tokenString, "Bearer ")
+			tokenString = strings.TrimPrefix(tokenString, bearerPrefix)
 		}
 
 		userClaims, err := services.ValidateToken(tokenString, cfg.JwtSecretKey)

@@ -61,6 +61,13 @@ func (t *TodoService) UpdateTodo(ctx context.Context, req models.UpdateTodoReque
 	if err := t.validator.Struct(req); err != nil {
 		return nil, errors.New("title and description are required")
 	}
+	existing, err := t.Repo.GetTodoByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if existing.UserID != userID {
+		return nil, ErrForbidden
+	}
 	return t.Repo.UpdateTodo(ctx, req, id, userID)
 }
 
