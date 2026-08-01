@@ -7,6 +7,8 @@ import (
 	"expense-tracker-api/internal/user"
 	"net/http"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 type contextKey string
@@ -37,4 +39,9 @@ func AuthMiddleware(next http.Handler, cfg *config.Config) http.Handler {
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func UserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	id, ok := ctx.Value(userIdKey).(uuid.UUID)
+	return id, ok
 }

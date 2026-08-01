@@ -87,7 +87,8 @@ func GenerateJwtToken(id uuid.UUID, secret string) (string, error) {
 }
 
 func ValidateToken(tokenString, secretKey string) (*UserClaims, error) {
-	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+	claims := &UserClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("signing method is not valid")
 		}
@@ -96,9 +97,9 @@ func ValidateToken(tokenString, secretKey string) (*UserClaims, error) {
 	if err != nil {
 		return nil, err
 	}
-	if claims, ok := token.Claims.(*UserClaims); ok && token.Valid {
-		return claims, nil
+	if !token.Valid {
+		return nil, fmt.Errorf("token is invalid")
 	}
 
-	return nil, fmt.Errorf("token is invalid")
+	return claims, nil
 }

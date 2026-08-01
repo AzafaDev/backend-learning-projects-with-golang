@@ -4,6 +4,8 @@ import (
 	"context"
 	"expense-tracker-api/internal/config"
 	"expense-tracker-api/internal/database"
+	"expense-tracker-api/internal/expense"
+	"expense-tracker-api/internal/middleware"
 	"expense-tracker-api/internal/user"
 	"net/http"
 	"os"
@@ -32,6 +34,16 @@ func main() {
 
 	mux.HandleFunc("POST /register", userHandler.Register)
 	mux.HandleFunc("POST /login", userHandler.Login)
+
+	expenseRepo := expense.NewExpenseRepository(db)
+	expenseService := expense.NewExpenseService(expenseRepo)
+	expenseHandler := expense.NewExpenseHandler(expenseService)
+
+	mux.Handle("POST /expenses", middleware.AuthMiddleware(http.HandlerFunc(expenseHandler.Create), cfg))
+	mux.Handle("GET /expenses", middleware.AuthMiddleware(http.HandlerFunc(expenseHandler.List), cfg))
+	mux.Handle("GET /expenses/{id}", middleware.AuthMiddleware(http.HandlerFunc(expenseHandler.GetByID), cfg))
+	mux.Handle("PUT /expenses/{id}", middleware.AuthMiddleware(http.HandlerFunc(expenseHandler.Update), cfg))
+	mux.Handle("DELETE /expenses/{id}", middleware.AuthMiddleware(http.HandlerFunc(expenseHandler.Delete), cfg))
 
 	mux.HandleFunc("GET /slow", func(w http.ResponseWriter, r *http.Request) {
 		log.Info().Msg("request started")
