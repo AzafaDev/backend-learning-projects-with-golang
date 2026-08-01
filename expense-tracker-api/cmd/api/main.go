@@ -1,0 +1,49 @@
+package main
+
+import (
+	"context"
+	"expense-tracker-api/internal/config"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/rs/zerolog/log"
+)
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	mux := http.NewServeMux()
+
+	cfg, err := config.LoadEnv()
+	if err != nil {
+		log.Fatal().Err(err).Msg("error in loadEnv")
+	}
+
+	server := http.Server{
+		Addr:              ":" + cfg.Port,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	go func() {
+		log.Info().Str("port", cfg.Port).Msg("server is running")
+		if err := server.ListenAndServe(); err != nil {
+			log.Fatal().Err(err).Msg("server failed to listen and serve")
+		}
+	}()
+
+	<-ctx.Done()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Error().Err(err).Msg("server is failed to shutdown")
+	}
+}
