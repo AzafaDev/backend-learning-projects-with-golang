@@ -22,6 +22,16 @@ func main() {
 		log.Fatal().Err(err).Msg("error in loadEnv")
 	}
 
+	mux.HandleFunc("GET /slow", func(w http.ResponseWriter, r *http.Request) {
+		log.Info().Msg("request started")
+
+		time.Sleep(10 * time.Second)
+
+		log.Info().Msg("request finished")
+
+		w.Write([]byte("done"))
+	})
+
 	server := http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           mux,
@@ -33,14 +43,14 @@ func main() {
 
 	go func() {
 		log.Info().Str("port", cfg.Port).Msg("server is running")
-		if err := server.ListenAndServe(); err != nil {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal().Err(err).Msg("server failed to listen and serve")
 		}
 	}()
 
 	<-ctx.Done()
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
