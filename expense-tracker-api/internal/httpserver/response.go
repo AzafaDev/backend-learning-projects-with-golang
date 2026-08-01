@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+
+	"github.com/rs/zerolog/log"
 )
 
 type ClientError struct {
@@ -27,6 +29,13 @@ func WriteError(w http.ResponseWriter, err error) {
 	}
 
 	WriteJSONError(w, "something went wrong, please try again later", http.StatusInternalServerError)
+}
+
+// RespondError logs err under the given action label, then writes a safe
+// response to the client via WriteError.
+func RespondError(w http.ResponseWriter, action string, err error) {
+	log.Error().Err(err).Msg(action)
+	WriteError(w, err)
 }
 
 func WriteJSON(w http.ResponseWriter, data any, status int) {
