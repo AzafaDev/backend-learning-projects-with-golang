@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,7 +36,7 @@ func (u *UserRepository) GetUserByEmail(ctx context.Context, email string) (*Use
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("user with email %s not found", email)
+			return nil, nil
 		}
 		return nil, err
 	}

@@ -2,7 +2,9 @@ package user
 
 import (
 	"context"
+	"expense-tracker-api/internal/httpserver"
 	"fmt"
+	"net/http"
 
 	"github.com/go-playground/validator"
 	"golang.org/x/crypto/bcrypt"
@@ -22,12 +24,15 @@ func NewUserService(repo *UserRepository) *UserService {
 
 func (u *UserService) Register(ctx context.Context, req RegisterRequest) (*User, error) {
 	if err := u.Validate.Struct(req); err != nil {
-		return nil, err
+		return nil, httpserver.NewClientError(http.StatusBadRequest, formatValidationError(err))
 	}
 
 	existing, err := u.Repo.GetUserByEmail(ctx, req.Email)
+	if err != nil {
+		return nil, err
+	}
 	if existing != nil {
-		return nil, fmt.Errorf("email is already exists")
+		return nil, httpserver.NewClientError(http.StatusConflict, "email is already registered")
 	}
 
 	passwordHash, err := hashPassword(req.Password)
@@ -39,23 +44,44 @@ func (u *UserService) Register(ctx context.Context, req RegisterRequest) (*User,
 }
 
 func (u *UserService) Login(ctx context.Context, req LoginRequest) (*User, error) {
+	invalidCredentials := httpserver.NewClientError(http.StatusUnauthorized, "invalid email or password")
+
 	if err := u.Validate.Struct(req); err != nil {
-		return nil, fmt.Errorf("invalid email or password")
+		return nil, invalidCredentials
 	}
 
 	existing, err := u.Repo.GetUserByEmail(ctx, req.Email)
+	if err != nil {
+		return nil, err
+	}
 	if existing == nil {
-		return nil, fmt.Errorf("invalid email or password")
-	} else if err != nil {
-		return nil, fmt.Errorf("invalid email or password")
+		return nil, invalidCredentials
 	}
 
-	matchingPassword := comparePassword(req.Password, existing.PasswordHash)
-	if !matchingPassword {
-		return nil, fmt.Errorf("invalid email or password")
+	if !comparePassword(req.Password, existing.PasswordHash) {
+		return nil, invalidCredentials
 	}
 
 	return existing, nil
+}
+
+func formatValidationError(err error) string {
+	validationErrors, ok := err.(validator.ValidationErrors)
+	if !ok || len(validationErrors) == 0 {
+		return "invalid request"
+	}
+
+	field := validationErrors[0]
+	switch field.Tag() {
+	case "required":
+		return fmt.Sprintf("%s is required", field.Field())
+	case "email":
+		return fmt.Sprintf("%s must be a valid email address", field.Field())
+	case "min":
+		return fmt.Sprintf("%s must be at least %s characters", field.Field(), field.Param())
+	default:
+		return fmt.Sprintf("%s is invalid", field.Field())
+	}
 }
 
 func hashPassword(password string) (string, error) {

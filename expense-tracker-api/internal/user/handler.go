@@ -34,14 +34,12 @@ func (u *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	createdUser, err := u.srv.Register(r.Context(), req)
 	if err != nil {
-		log.Error().Err(err).Msg("register: user handler")
-		httpserver.WriteJSONError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, "register", err)
 		return
 	}
 	token, err := GenerateJwtToken(createdUser.ID, u.cfg.JWTSecretKey)
 	if err != nil {
-		log.Error().Err(err).Msg("register: user handler")
-		httpserver.WriteJSONError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, "register", err)
 		return
 	}
 
@@ -57,18 +55,23 @@ func (u *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	existingUser, err := u.srv.Login(r.Context(), req)
 	if err != nil {
-		log.Error().Err(err).Msg("login: user handler")
-		httpserver.WriteJSONError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, "login", err)
 		return
 	}
 	token, err := GenerateJwtToken(existingUser.ID, u.cfg.JWTSecretKey)
 	if err != nil {
-		log.Error().Err(err).Msg("login: user handler")
-		httpserver.WriteJSONError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, "login", err)
 		return
 	}
 
-	httpserver.WriteJSON(w, token, http.StatusCreated)
+	httpserver.WriteJSON(w, token, http.StatusOK)
+}
+
+// writeError logs the real error for diagnostics, then delegates to
+// httpserver.WriteError to send the client a safe response.
+func writeError(w http.ResponseWriter, action string, err error) {
+	log.Error().Err(err).Msgf("%s: user handler", action)
+	httpserver.WriteError(w, err)
 }
 
 func GenerateJwtToken(id uuid.UUID, secret string) (string, error) {
