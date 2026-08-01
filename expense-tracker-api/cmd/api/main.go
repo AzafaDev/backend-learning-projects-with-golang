@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"expense-tracker-api/internal/config"
+	"expense-tracker-api/internal/database"
 	"net/http"
 	"os"
 	"os/signal"
@@ -21,6 +22,8 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("error in loadEnv")
 	}
+
+	_, err = database.NewDatabase(cfg.DatabaseURL, ctx)
 
 	mux.HandleFunc("GET /slow", func(w http.ResponseWriter, r *http.Request) {
 		log.Info().Msg("request started")
