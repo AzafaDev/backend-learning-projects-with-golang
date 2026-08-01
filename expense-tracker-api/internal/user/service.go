@@ -74,3 +74,4 @@ func comparePassword(password, passwordHash string) bool {
 	}
 	return true
 }
+
