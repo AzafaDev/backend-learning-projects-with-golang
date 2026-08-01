@@ -165,7 +165,7 @@ func (t *TodoRepository) CountTodosByUserID(ctx context.Context, userID uuid.UUI
 	var count int
 	query := `SELECT COUNT(*) FROM todos WHERE user_id=$1`
 	if err := t.Db.QueryRow(ctx, query, userID).Scan(&count); err != nil {
-		return 0,  fmt.Errorf("count todos: %v", err)
+		return 0, fmt.Errorf("count todos: %v", err)
 	}
 	return count, nil
 }

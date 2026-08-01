@@ -24,7 +24,7 @@ func AuthMiddleware(next http.Handler, cfg config.Config) http.Handler {
 			return
 		}
 		tokenString := authHeader
-		if ok := strings.HasPrefix(authHeader, "Bearer"); ok {
+		if ok := strings.HasPrefix(authHeader, bearerPrefix); ok {
 			tokenString = strings.TrimPrefix(tokenString, bearerPrefix)
 		}
 

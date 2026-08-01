@@ -119,3 +119,24 @@ func (t *TodoHandler) GetTodos(w http.ResponseWriter, r *http.Request) {
 
 	utils.WriteJSON(w, todos, http.StatusOK)
 }
+
+func (t *TodoHandler) GetTodoByID(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		utils.WriteJSONError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		utils.WriteJSONError(w, "id is invalid", http.StatusBadRequest)
+		return
+	}
+
+	todo, err := t.srv.GetTodoByID(r.Context(), id, userID)
+	if err != nil {
+		writeTodoError(w, err)
+		return
+	}
+
+	utils.WriteJSON(w, todo, http.StatusOK)
+}

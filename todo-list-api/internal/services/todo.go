@@ -83,5 +83,12 @@ func (t *TodoService) DeleteTodo(ctx context.Context, id, userID uuid.UUID) (*mo
 }
 
 func (t *TodoService) GetTodoByID(ctx context.Context, id, userID uuid.UUID) (*models.Todo, error) {
-	return t.Repo.GetTodoByID(ctx, id)
+	existing, err := t.Repo.GetTodoByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if existing.UserID != userID {
+		return nil, ErrForbidden
+	}
+	return existing, nil
 }

@@ -49,6 +49,7 @@ func main() {
 	mux.Handle("PUT /todos/{id}", middleware.AuthMiddleware(http.HandlerFunc(todoHandler.UpdateTodo), *cfg))
 	mux.Handle("DELETE /todos/{id}", middleware.AuthMiddleware(http.HandlerFunc(todoHandler.DeleteTodo), *cfg))
 	mux.Handle("GET /todos", middleware.AuthMiddleware(http.HandlerFunc(todoHandler.GetTodos), *cfg))
+	mux.Handle("GET /todos/{id}", middleware.AuthMiddleware(http.HandlerFunc(todoHandler.GetTodoByID), *cfg))
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
