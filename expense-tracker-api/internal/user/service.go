@@ -28,8 +28,6 @@ func (u *UserService) Register(ctx context.Context, req RegisterRequest) (*User,
 	existing, err := u.Repo.GetUserByEmail(ctx, req.Email)
 	if existing != nil {
 		return nil, fmt.Errorf("email is already exists")
-	} else if err != nil {
-		return nil, err
 	}
 
 	passwordHash, err := hashPassword(req.Password)
@@ -37,7 +35,7 @@ func (u *UserService) Register(ctx context.Context, req RegisterRequest) (*User,
 		return nil, err
 	}
 
-	return u.Repo.CreateUser(ctx, req.Email, passwordHash)
+	return u.Repo.CreateUser(ctx, req.Name, req.Email, passwordHash)
 }
 
 func (u *UserService) Login(ctx context.Context, req LoginRequest) (*User, error) {
@@ -74,4 +72,3 @@ func comparePassword(password, passwordHash string) bool {
 	}
 	return true
 }
-

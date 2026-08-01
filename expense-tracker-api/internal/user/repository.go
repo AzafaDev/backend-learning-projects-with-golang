@@ -45,15 +45,15 @@ func (u *UserRepository) GetUserByEmail(ctx context.Context, email string) (*Use
 	return &user, nil
 }
 
-func (u *UserRepository) CreateUser(ctx context.Context, email, passwordHash string) (*User, error) {
+func (u *UserRepository) CreateUser(ctx context.Context, name, email, passwordHash string) (*User, error) {
 	var user User
 	query := `
-	INSER INTO users
-	(email, password_hash)
-	VALUES ($1, $2)
+	INSERT INTO users
+	(name, email, password_hash)
+	VALUES ($1, $2, $3)
 	RETURNING id, name, email, password_hash, created_at, updated_at
 	`
-	err := u.DB.QueryRow(ctx, query, email, passwordHash).Scan(
+	err := u.DB.QueryRow(ctx, query, name, email, passwordHash).Scan(
 		&user.ID,
 		&user.Name,
 		&user.Email,

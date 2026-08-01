@@ -45,7 +45,7 @@ func (u *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpserver.WriteJSON(w, map[string]string{"token": token}, http.StatusCreated)
+	httpserver.WriteJSON(w, token, http.StatusCreated)
 }
 
 func (u *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +68,7 @@ func (u *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpserver.WriteJSON(w, map[string]string{"token": token}, http.StatusCreated)
+	httpserver.WriteJSON(w, token, http.StatusCreated)
 }
 
 func GenerateJwtToken(id uuid.UUID, secret string) (string, error) {
@@ -80,7 +80,7 @@ func GenerateJwtToken(id uuid.UUID, secret string) (string, error) {
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	signedToken, err := token.SignedString([]byte(secret))
 	if err != nil {
