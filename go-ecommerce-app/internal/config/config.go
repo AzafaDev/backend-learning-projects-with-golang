@@ -13,6 +13,7 @@ type Config struct {
 	DatabaseURL         string
 	JWTSecret           string
 	JWTExpiry           time.Duration
+	RefreshTokenExpiry  time.Duration
 	MidtransServerKey   string
 	MidtransEnv         string
 	MidtransMerchantID  string
@@ -36,14 +37,20 @@ func NewConfig() (*Config, error) {
 		return nil, fmt.Errorf("error parsing ORDER_SWEEP_THRESHOLD")
 	}
 
-	jwtExpiry, err := time.ParseDuration(getEnv("JWT_EXPIRY", "24h"))
+	jwtExpiry, err := time.ParseDuration(getEnv("JWT_EXPIRY", "15m"))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing JWT_EXPIRY")
+	}
+
+	refreshTokenExpiry, err := time.ParseDuration(getEnv("REFRESH_TOKEN_EXPIRY", "168h"))
+	if err != nil {
+		return nil, fmt.Errorf("error parsing REFRESH_TOKEN_EXPIRY")
 	}
 
 	cfg := Config{
 		Port:                getEnv("PORT", "8080"),
 		JWTExpiry:           jwtExpiry,
+		RefreshTokenExpiry:  refreshTokenExpiry,
 		DatabaseURL:         os.Getenv("DATABASE_URL"),
 		JWTSecret:           os.Getenv("JWT_SECRET"),
 		MidtransServerKey:   os.Getenv("MIDTRANS_SERVER_KEY"),

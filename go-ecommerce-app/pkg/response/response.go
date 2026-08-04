@@ -1,4 +1,4 @@
-package handler
+package response
 
 import (
 	"encoding/json"
@@ -17,7 +17,7 @@ func WriteJSON(jsonResponse JSONResponse, status int, w http.ResponseWriter) {
 	json.NewEncoder(w).Encode(jsonResponse)
 }
 
-func writeErrorJSON(message string, status int, w http.ResponseWriter) {
+func WriteErrorJSON(message string, status int, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]any{

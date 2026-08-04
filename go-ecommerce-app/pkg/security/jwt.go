@@ -1,7 +1,7 @@
 package security
 
 import (
-	"go-ecommerce-app/internal/model"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -9,19 +9,15 @@ import (
 )
 
 type Claims struct {
-	ID       uuid.UUID `json:"id"`
-	FullName string    `json:"full_name"`
-	Email    string    `json:"email"`
-	Role     string    `json:"role"`
+	ID   uuid.UUID `json:"id"`
+	Role string    `json:"role"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(secretKey string, expiry time.Duration, user model.UserResponse) (string, error) {
+func GenerateToken(secretKey string, expiry time.Duration, userID uuid.UUID, userRole string) (string, error) {
 	claims := Claims{
-		ID:       user.ID,
-		FullName: user.FullName,
-		Email:    user.Email,
-		Role:     user.Role,
+		ID:   userID,
+		Role: userRole,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
@@ -31,4 +27,24 @@ func GenerateToken(secretKey string, expiry time.Duration, user model.UserRespon
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	return token.SignedString([]byte(secretKey))
+}
+
+func ParseToken(secretKey string, tokenString string) (*Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("method is invalid")
+		}
+		return []byte(secretKey), nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("error in parsing token: %w", err)
+	}
+
+	claims, ok := token.Claims.(*Claims)
+	if !ok {
+		return nil, fmt.Errorf("error in converting to claim: %w", err)
+	}
+
+	return claims, nil
 }

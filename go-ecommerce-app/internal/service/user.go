@@ -8,8 +8,10 @@ import (
 	"go-ecommerce-app/internal/model"
 	"go-ecommerce-app/internal/repository"
 	"go-ecommerce-app/pkg/security"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const pgUniqueViolationCode = "23505"
@@ -56,27 +58,37 @@ func (u *UserService) Register(ctx context.Context, req model.RegisterUserReques
 	}, nil
 }
 
-func (u *UserService) Login(ctx context.Context, req model.LoginUserRequest) (*model.UserResponse, string, error) {
+func (u *UserService) Login(ctx context.Context, req model.LoginUserRequest) (*model.UserResponse, string, string, error) {
 	existingUser, err := u.repo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		return nil, "", fmt.Errorf("error in getting user by email: %w", err)
+		return nil, "", "", fmt.Errorf("error in getting user by email: %w", err)
 	}
 
 	if err := security.ComparePassword(existingUser.PasswordHash, req.Password); err != nil {
-		return nil, "", fmt.Errorf("error in comparing password: %w", err)
+		return nil, "", "", fmt.Errorf("error in comparing password: %w", err)
 	}
 
-	signedToken, err := security.GenerateToken(u.cfg.JWTSecret, u.cfg.JWTExpiry, model.UserResponse{
-		ID:        existingUser.ID.Bytes,
-		FullName:  existingUser.FullName,
-		Email:     existingUser.Email,
-		Role:      existingUser.Role,
-		CreatedAt: existingUser.CreatedAt.Time,
-		UpdatedAt: existingUser.UpdatedAt.Time,
-	})
+	signedToken, err := security.GenerateToken(u.cfg.JWTSecret, u.cfg.JWTExpiry, existingUser.ID.Bytes, existingUser.Role)
 
 	if err != nil {
-		return nil, "", fmt.Errorf("error in generating token JWT: %w", err)
+		return nil, "", "", fmt.Errorf("error in generating token JWT: %w", err)
+	}
+
+	rawToken, err := security.GenerateRefreshToken()
+	if err != nil {
+		return nil, "", "", fmt.Errorf("error in generating refresh token: %w", err)
+	}
+	hashedToken := security.HashRefreshToken(rawToken)
+
+	if err := u.repo.CreateRefreshToken(ctx, repository.CreateRefreshTokenParams{
+		UserID:    existingUser.ID,
+		TokenHash: hashedToken,
+		ExpiresAt: pgtype.Timestamptz{
+			Time:  time.Now().Add(u.cfg.RefreshTokenExpiry),
+			Valid: true,
+		},
+	}); err != nil {
+		return nil, "", "", fmt.Errorf("error in creating refresh token: %w", err)
 	}
 
 	return &model.UserResponse{
@@ -86,5 +98,57 @@ func (u *UserService) Login(ctx context.Context, req model.LoginUserRequest) (*m
 		Role:      existingUser.Role,
 		CreatedAt: existingUser.CreatedAt.Time,
 		UpdatedAt: existingUser.UpdatedAt.Time,
-	}, signedToken, nil
+	}, signedToken, rawToken, nil
+}
+
+func (u *UserService) Refresh(ctx context.Context, rawToken string) (string, string, error) {
+	tokenHash := security.HashRefreshToken(rawToken)
+
+	existingRefreshToken, err := u.repo.GetRefreshToken(ctx, tokenHash)
+	if err != nil {
+		return "", "", fmt.Errorf("error in get refresh token: %w", err)
+	}
+
+	if err := u.repo.RevokeRefreshToken(ctx, existingRefreshToken.TokenHash); err != nil {
+		return "", "", fmt.Errorf("error in get refresh token: %w", err)
+	}
+
+	newRawToken, err := security.GenerateRefreshToken()
+	if err != nil {
+		return "", "", fmt.Errorf("error in generating refresh token: %w", err)
+	}
+	hashedToken := security.HashRefreshToken(newRawToken)
+
+	if err := u.repo.CreateRefreshToken(ctx, repository.CreateRefreshTokenParams{
+		UserID:    existingRefreshToken.UserID,
+		TokenHash: hashedToken,
+		ExpiresAt: pgtype.Timestamptz{
+			Time:  time.Now().Add(u.cfg.RefreshTokenExpiry),
+			Valid: true,
+		},
+	}); err != nil {
+		return "", "", fmt.Errorf("error in creating refresh token: %w", err)
+	}
+
+	existingUser, err := u.repo.GetUserByID(ctx, existingRefreshToken.UserID)
+	if err != nil {
+		return "", "", fmt.Errorf("error in getting user by id: %w", err)
+	}
+
+	accessToken, err := security.GenerateToken(u.cfg.JWTSecret, u.cfg.JWTExpiry, existingRefreshToken.UserID.Bytes, existingUser.Role)
+	if err != nil {
+		return "", "", fmt.Errorf("error in generating token: %w", err)
+	}
+
+	return accessToken, newRawToken, nil
+}
+
+func (u *UserService) Logout(ctx context.Context, rawToken string) error {
+	tokenHash := security.HashRefreshToken(rawToken)
+
+	if err := u.repo.RevokeRefreshToken(ctx, tokenHash); err != nil {
+		return fmt.Errorf("error in revoking refresh token: %w", err)
+	}
+
+	return nil
 }
