@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"go-ecommerce-app/internal/middleware"
 	"go-ecommerce-app/internal/model"
 	"go-ecommerce-app/internal/service"
@@ -37,6 +38,7 @@ func (u *UserHandler) UserRoutes(r chi.Router) {
 		r.Post("/register", u.Register)
 		r.Post("/logout", u.Logout)
 		r.Post("/refresh", u.Refresh)
+		r.Post("/verify-email", u.VerifyEmail)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(u.jwtSecretKey))
@@ -95,6 +97,11 @@ func (u *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	existingUser, accessToken, refreshToken, err := u.srv.Login(r.Context(), req)
 	if err != nil {
+		if errors.Is(err, service.ErrUserNotVerified) {
+			slog.Error("login", "error", err)
+			response.WriteErrorJSON("please verify your email", http.StatusForbidden, w)
+			return
+		}
 		slog.Error("login", "error", err)
 		response.WriteErrorJSON("invalid email or password", http.StatusBadRequest, w)
 		return
@@ -237,4 +244,63 @@ func (u *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
 			"role": claims.Role,
 		},
 	}, http.StatusOK, w)
+}
+
+func (u *UserHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	rawToken := r.URL.Query().Get("token")
+	if rawToken == "" {
+		slog.Error("verify email", "error", fmt.Errorf("invalid request url query of token"))
+		response.WriteErrorJSON("invalid or expired token", http.StatusUnauthorized, w)
+		return
+	}
+
+	if err := u.srv.VerifyEmail(r.Context(), rawToken); err != nil {
+		slog.Error("verify email", "error", err)
+		response.WriteErrorJSON("invalid or expired token", http.StatusUnauthorized, w)
+		return
+	}
+
+	response.WriteJSON(response.JSONResponse{
+		Success: true,
+		Data: map[string]any{
+			"message": "email verified successfully",
+		},
+	}, http.StatusOK, w)
+}
+
+func (u *UserHandler) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	var req model.ResendVerificationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Error("resend verification", "error", err)
+		response.WriteJSON(response.JSONResponse{
+			Success: true,
+			Data: map[string]string{
+				"message": "verification email link sent successfully if email exists",
+			},
+		}, http.StatusOK, w)
+		return
+	}
+
+	if err := u.validate.Struct(req); err != nil {
+		slog.Error("resend verification", "error", err)
+		response.WriteJSON(response.JSONResponse{
+			Success: true,
+			Data: map[string]string{
+				"message": "verification email link sent successfully if email exists",
+			},
+		}, http.StatusOK, w)
+		return
+	}
+
+	if err := u.srv.ResendVerification(r.Context(), req.Email); err != nil {
+		slog.Error("resend verification", "error", err)
+		response.WriteJSON(response.JSONResponse{
+			Success: true,
+			Data: map[string]string{
+				"message": "verification email link sent successfully if email exists",
+			},
+		}, http.StatusOK, w)
+		return
+	}
+
 }

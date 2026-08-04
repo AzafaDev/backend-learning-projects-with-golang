@@ -98,6 +98,10 @@ func (u *UserService) Login(ctx context.Context, req model.LoginUserRequest) (*m
 		return nil, "", "", fmt.Errorf("error in comparing password: %w", err)
 	}
 
+	if !existingUser.EmailVerifiedAt.Valid {
+		return nil, "", "", ErrUserNotVerified
+	}
+
 	signedToken, err := security.GenerateToken(u.cfg.JWTSecret, u.cfg.JWTExpiry, existingUser.ID.Bytes, existingUser.Role)
 
 	if err != nil {
@@ -180,5 +184,58 @@ func (u *UserService) Logout(ctx context.Context, rawToken string) error {
 		return fmt.Errorf("error in revoking refresh token: %w", err)
 	}
 
+	return nil
+}
+
+func (u *UserService) VerifyEmail(ctx context.Context, rawToken string) error {
+	tokenHash := security.HashRefreshToken(rawToken)
+
+	existingEmailToken, err := u.repo.GetEmailVerificationByTokenHash(ctx, tokenHash)
+	if err != nil {
+		return fmt.Errorf("error in getting email verification token: %w", err)
+	}
+
+	_, err = u.repo.SetUserVerified(ctx, existingEmailToken.UserID)
+	if err != nil {
+		return fmt.Errorf("error in verifying email: %w", err)
+	}
+
+	if err := u.repo.DeleteEmailVerificationByTokenHash(ctx, existingEmailToken.TokenHash); err != nil {
+		return fmt.Errorf("error in deleting email verification token: %w", err)
+	}
+
+	return nil
+}
+
+func (u *UserService) ResendVerification(ctx context.Context, email string) error {
+	trimEmail := strings.ToLower(strings.TrimSpace(email))
+
+	existingUser, err := u.repo.GetUserByEmail(ctx, trimEmail)
+	if err != nil {
+		return fmt.Errorf("error in getting user by email: %w", err)
+	}
+
+	randomString, err := security.GenerateRefreshToken()
+	if err != nil {
+		return fmt.Errorf("error in generatin random string token: %w", err)
+	}
+	hashedToken := security.HashRefreshToken(randomString)
+
+	_, err = u.repo.CreateVericationEmail(ctx, repository.CreateVericationEmailParams{
+		UserID:    existingUser.ID,
+		TokenHash: hashedToken,
+		ExpiresAt: pgtype.Timestamptz{
+			Time:  expiryVerificationEmail,
+			Valid: true,
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("error in creating verification email token: %w", err)
+	}
+
+	if err := u.email.SendVerificationEmail(ctx, existingUser.Email, randomString); err != nil {
+		return fmt.Errorf("error in sending verification email: %w", err)
+	}
 	return nil
 }

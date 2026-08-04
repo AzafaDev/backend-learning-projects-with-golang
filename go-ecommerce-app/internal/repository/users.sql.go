@@ -82,3 +82,26 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	)
 	return i, err
 }
+
+const setUserVerified = `-- name: SetUserVerified :one
+UPDATE users
+SET email_verified_at = now()
+WHERE id = $1
+RETURNING id, full_name, email, password_hash, role, created_at, updated_at, email_verified_at
+`
+
+func (q *Queries) SetUserVerified(ctx context.Context, id pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, setUserVerified, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.FullName,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.EmailVerifiedAt,
+	)
+	return i, err
+}

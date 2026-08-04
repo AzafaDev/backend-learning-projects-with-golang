@@ -10,3 +10,8 @@ RETURNING *;
 SELECT * 
 FROM users
 WHERE id = $1;
+-- name: SetUserVerified :one
+UPDATE users
+SET email_verified_at = now()
+WHERE id = $1
+RETURNING *;

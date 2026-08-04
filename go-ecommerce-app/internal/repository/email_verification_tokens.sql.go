@@ -36,3 +36,32 @@ func (q *Queries) CreateVericationEmail(ctx context.Context, arg CreateVericatio
 	)
 	return i, err
 }
+
+const deleteEmailVerificationByTokenHash = `-- name: DeleteEmailVerificationByTokenHash :exec
+DELETE FROM email_verification_tokens
+WHERE token_hash = $1
+`
+
+func (q *Queries) DeleteEmailVerificationByTokenHash(ctx context.Context, tokenHash string) error {
+	_, err := q.db.Exec(ctx, deleteEmailVerificationByTokenHash, tokenHash)
+	return err
+}
+
+const getEmailVerificationByTokenHash = `-- name: GetEmailVerificationByTokenHash :one
+SELECT id, user_id, token_hash, expires_at, created_at, updated_at FROM email_verification_tokens
+WHERE token_hash = $1 AND expires_at > now()
+`
+
+func (q *Queries) GetEmailVerificationByTokenHash(ctx context.Context, tokenHash string) (EmailVerificationToken, error) {
+	row := q.db.QueryRow(ctx, getEmailVerificationByTokenHash, tokenHash)
+	var i EmailVerificationToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
