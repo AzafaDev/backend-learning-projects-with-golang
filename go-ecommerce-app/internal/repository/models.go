@@ -17,6 +17,15 @@ type EmailVerificationToken struct {
 	UpdatedAt pgtype.Timestamptz
 }
 
+type PasswordResetToken struct {
+	ID        pgtype.UUID
+	UserID    pgtype.UUID
+	TokenHash string
+	ExpiresAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
 type RefreshToken struct {
 	ID        pgtype.UUID
 	UserID    pgtype.UUID

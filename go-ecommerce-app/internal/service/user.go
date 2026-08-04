@@ -16,6 +16,7 @@ import (
 )
 
 var expiryVerificationEmail = time.Now().Add(24 * time.Hour)
+var expiryResetPasswordEmail = time.Now().Add(15 * time.Minute)
 
 const pgUniqueViolationCode = "23505"
 
@@ -226,6 +227,39 @@ func (u *UserService) ResendVerification(ctx context.Context, email string) erro
 		TokenHash: hashedToken,
 		ExpiresAt: pgtype.Timestamptz{
 			Time:  expiryVerificationEmail,
+			Valid: true,
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("error in creating verification email token: %w", err)
+	}
+
+	if err := u.email.SendVerificationEmail(ctx, existingUser.Email, randomString); err != nil {
+		return fmt.Errorf("error in sending verification email: %w", err)
+	}
+	return nil
+}
+
+func (u *UserService) ForgotPassword(ctx context.Context, email string) error {
+	trimEmail := strings.ToLower(strings.TrimSpace(email))
+
+	existingUser, err := u.repo.GetUserByEmail(ctx, trimEmail)
+	if err != nil {
+		return fmt.Errorf("error in getting user by email: %w", err)
+	}
+
+	randomString, err := security.GenerateRefreshToken()
+	if err != nil {
+		return fmt.Errorf("error in generatin random string token: %w", err)
+	}
+	hashedToken := security.HashRefreshToken(randomString)
+
+	_, err = u.repo.CreateResetPasswordToken(ctx, repository.CreateResetPasswordTokenParams{
+		UserID:    existingUser.ID,
+		TokenHash: hashedToken,
+		ExpiresAt: pgtype.Timestamptz{
+			Time:  expiryResetPasswordEmail,
 			Valid: true,
 		},
 	})

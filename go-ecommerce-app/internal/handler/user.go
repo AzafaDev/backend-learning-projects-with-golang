@@ -39,6 +39,8 @@ func (u *UserHandler) UserRoutes(r chi.Router) {
 		r.Post("/logout", u.Logout)
 		r.Post("/refresh", u.Refresh)
 		r.Post("/verify-email", u.VerifyEmail)
+		r.Post("/resend-verification", u.ResendVerification)
+		r.Post("/forgot-password", u.ForgotPassword)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(u.jwtSecretKey))
@@ -275,7 +277,7 @@ func (u *UserHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 		response.WriteJSON(response.JSONResponse{
 			Success: true,
 			Data: map[string]string{
-				"message": "verification email link sent successfully if email exists",
+				"message": "if that email exists, we sent a link",
 			},
 		}, http.StatusOK, w)
 		return
@@ -286,7 +288,7 @@ func (u *UserHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 		response.WriteJSON(response.JSONResponse{
 			Success: true,
 			Data: map[string]string{
-				"message": "verification email link sent successfully if email exists",
+				"message": "if that email exists, we sent a link",
 			},
 		}, http.StatusOK, w)
 		return
@@ -297,10 +299,59 @@ func (u *UserHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 		response.WriteJSON(response.JSONResponse{
 			Success: true,
 			Data: map[string]string{
-				"message": "verification email link sent successfully if email exists",
+				"message": "if that email exists, we sent a link",
 			},
 		}, http.StatusOK, w)
 		return
 	}
 
+	response.WriteJSON(response.JSONResponse{
+		Success: true,
+		Data: map[string]string{
+			"message": "if that email exists, we sent a link",
+		},
+	}, http.StatusOK, w)
+}
+
+func (u *UserHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var req model.ForgotPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Error("forgot password", "error", err)
+		response.WriteJSON(response.JSONResponse{
+			Success: true,
+			Data: map[string]string{
+				"message": "if that email exists, we sent a link",
+			},
+		}, http.StatusOK, w)
+		return
+	}
+
+	if err := u.validate.Struct(req); err != nil {
+		slog.Error("forgot password", "error", err)
+		response.WriteJSON(response.JSONResponse{
+			Success: true,
+			Data: map[string]string{
+				"message": "if that email exists, we sent a link",
+			},
+		}, http.StatusOK, w)
+		return
+	}
+
+	if err := u.srv.ForgotPassword(r.Context(), req.Email); err != nil {
+		slog.Error("forgot password", "error", err)
+		response.WriteJSON(response.JSONResponse{
+			Success: true,
+			Data: map[string]string{
+				"message": "if that email exists, we sent a link",
+			},
+		}, http.StatusOK, w)
+		return
+	}
+
+	response.WriteJSON(response.JSONResponse{
+		Success: true,
+		Data: map[string]string{
+			"message": "if that email exists, we sent a link",
+		},
+	}, http.StatusOK, w)
 }

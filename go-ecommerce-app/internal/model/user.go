@@ -29,3 +29,7 @@ type UserResponse struct {
 type ResendVerificationRequest struct {
 	Email string `json:"email" validate:"required,email"`
 }
+
+type ForgotPasswordRequest struct {
+	Email string `json:"email" validate:"required,email"`
+}
