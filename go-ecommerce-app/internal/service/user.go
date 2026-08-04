@@ -8,23 +8,28 @@ import (
 	"go-ecommerce-app/internal/model"
 	"go-ecommerce-app/internal/repository"
 	"go-ecommerce-app/pkg/security"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+var expiryVerificationEmail = time.Now().Add(24 * time.Hour)
+
 const pgUniqueViolationCode = "23505"
 
 type UserService struct {
-	repo *repository.Queries
-	cfg  *config.Config
+	repo  *repository.Queries
+	cfg   *config.Config
+	email EmailSender
 }
 
-func NewUserService(repo *repository.Queries, cfg *config.Config) *UserService {
+func NewUserService(repo *repository.Queries, cfg *config.Config, email EmailSender) *UserService {
 	return &UserService{
-		repo: repo,
-		cfg:  cfg,
+		repo:  repo,
+		cfg:   cfg,
+		email: email,
 	}
 }
 
@@ -34,9 +39,11 @@ func (u *UserService) Register(ctx context.Context, req model.RegisterUserReques
 		return nil, err
 	}
 
+	trimEmail := strings.ToLower(strings.TrimSpace(req.Email))
+
 	createdUser, err := u.repo.CreateUser(ctx, repository.CreateUserParams{
 		FullName:     req.FullName,
-		Email:        req.Email,
+		Email:        trimEmail,
 		PasswordHash: passwordHash,
 	})
 
@@ -46,6 +53,29 @@ func (u *UserService) Register(ctx context.Context, req model.RegisterUserReques
 			return nil, ErrEmailTaken
 		}
 		return nil, fmt.Errorf("error in creating user: %w", err)
+	}
+
+	randomString, err := security.GenerateRefreshToken()
+	if err != nil {
+		return nil, fmt.Errorf("error in generatin random string token: %w", err)
+	}
+	hashedToken := security.HashRefreshToken(randomString)
+
+	_, err = u.repo.CreateVericationEmail(ctx, repository.CreateVericationEmailParams{
+		UserID:    createdUser.ID,
+		TokenHash: hashedToken,
+		ExpiresAt: pgtype.Timestamptz{
+			Time:  expiryVerificationEmail,
+			Valid: true,
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("error in creating verification email token: %w", err)
+	}
+
+	if err := u.email.SendVerificationEmail(ctx, createdUser.Email, randomString); err != nil {
+		return nil, fmt.Errorf("error in sending verification email: %w", err)
 	}
 
 	return &model.UserResponse{

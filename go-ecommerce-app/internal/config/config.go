@@ -20,6 +20,9 @@ type Config struct {
 	MidtransClientKey   string
 	OrderSweepInterval  time.Duration
 	OrderSweepThreshold time.Duration
+	ResendAPIKey        string
+	FrontendURL         string
+	ResendFromAddress   string
 }
 
 func NewConfig() (*Config, error) {
@@ -57,8 +60,11 @@ func NewConfig() (*Config, error) {
 		MidtransEnv:         os.Getenv("MIDTRANS_ENV"),
 		MidtransMerchantID:  os.Getenv("MIDTRANS_MERCHANT_ID"),
 		MidtransClientKey:   os.Getenv("MIDTRANS_CLIENT_KEY"),
+		ResendAPIKey:        os.Getenv("RESEND_API_KEY"),
+		ResendFromAddress:   os.Getenv("RESEND_FROM_ADDRESS"),
 		OrderSweepInterval:  orderSweepInterval,
 		OrderSweepThreshold: orderSweepThreshold,
+		FrontendURL:         getEnv("FRONTEND_URL", "http://localhost:5173"),
 	}
 
 	var missing []string
@@ -70,6 +76,8 @@ func NewConfig() (*Config, error) {
 		"MIDTRANS_ENV":         cfg.MidtransEnv,
 		"MIDTRANS_MERCHANT_ID": cfg.MidtransMerchantID,
 		"MIDTRANS_CLIENT_KEY":  cfg.MidtransClientKey,
+		"RESEND_API_KEY":       cfg.ResendAPIKey,
+		"RESEND_FROM_ADDRESS":  cfg.ResendFromAddress,
 	} {
 		if value == "" {
 			missing = append(missing, index)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"go-ecommerce-app/internal/config"
+	"go-ecommerce-app/internal/email"
 	"go-ecommerce-app/internal/handler"
 	"go-ecommerce-app/internal/repository"
 	"go-ecommerce-app/internal/service"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/cors"
 )
 
 func main() {
@@ -37,9 +39,11 @@ func main() {
 	}
 	defer dbPool.Close()
 
+	senderEmail := email.NewResendClient(cfg.ResendAPIKey, cfg.ResendFromAddress, cfg.FrontendURL)
+
 	repo := repository.New(dbPool)
 
-	userService := service.NewUserService(repo, cfg)
+	userService := service.NewUserService(repo, cfg, senderEmail)
 	userHandler := handler.NewUserHandler(userService, cfg.JWTSecret, cfg.RefreshTokenExpiry)
 
 	r := chi.NewRouter()
@@ -51,6 +55,11 @@ func main() {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Route("/api", func(r chi.Router) {
+		r.Use(cors.Handler(cors.Options{
+			AllowedOrigins:   []string{cfg.FrontendURL},
+			AllowCredentials: true,
+			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		}))
 		userHandler.UserRoutes(r)
 	})
 
