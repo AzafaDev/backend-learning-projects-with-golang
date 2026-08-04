@@ -1,0 +1,85 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/joho/godotenv"
+)
+
+type Config struct {
+	Port                string
+	DatabaseURL         string
+	JWTSecret           string
+	JWTExpiry           time.Duration
+	MidtransServerKey   string
+	MidtransEnv         string
+	MidtransMerchantID  string
+	MidtransClientKey   string
+	OrderSweepInterval  time.Duration
+	OrderSweepThreshold time.Duration
+}
+
+func NewConfig() (*Config, error) {
+	if err := godotenv.Load(); err != nil {
+		return nil, err
+	}
+
+	orderSweepInterval, err := time.ParseDuration(getEnv("ORDER_SWEEP_INTERVAL", "5m"))
+	if err != nil {
+		return nil, fmt.Errorf("error parsing ORDER_SWEEP_INTERVAL")
+	}
+
+	orderSweepThreshold, err := time.ParseDuration(getEnv("ORDER_SWEEP_THRESHOLD", "30m"))
+	if err != nil {
+		return nil, fmt.Errorf("error parsing ORDER_SWEEP_THRESHOLD")
+	}
+
+	jwtExpiry, err := time.ParseDuration(getEnv("JWT_EXPIRY", "24h"))
+	if err != nil {
+		return nil, fmt.Errorf("error parsing JWT_EXPIRY")
+	}
+
+	cfg := Config{
+		Port:                getEnv("PORT", "8080"),
+		JWTExpiry:           jwtExpiry,
+		DatabaseURL:         os.Getenv("DATABASE_URL"),
+		JWTSecret:           os.Getenv("JWT_SECRET"),
+		MidtransServerKey:   os.Getenv("MIDTRANS_SERVER_KEY"),
+		MidtransEnv:         os.Getenv("MIDTRANS_ENV"),
+		MidtransMerchantID:  os.Getenv("MIDTRANS_MERCHANT_ID"),
+		MidtransClientKey:   os.Getenv("MIDTRANS_CLIENT_KEY"),
+		OrderSweepInterval:  orderSweepInterval,
+		OrderSweepThreshold: orderSweepThreshold,
+	}
+
+	var missing []string
+
+	for index, value := range map[string]string{
+		"DATABASE_URL":         cfg.DatabaseURL,
+		"JWT_SECRET":           cfg.JWTSecret,
+		"MIDTRANS_SERVER_KEY":  cfg.MidtransServerKey,
+		"MIDTRANS_ENV":         cfg.MidtransEnv,
+		"MIDTRANS_MERCHANT_ID": cfg.MidtransMerchantID,
+		"MIDTRANS_CLIENT_KEY":  cfg.MidtransClientKey,
+	} {
+		if value == "" {
+			missing = append(missing, index)
+		}
+	}
+
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("missing .env value: %v", missing)
+	}
+
+	return &cfg, nil
+}
+
+func getEnv(key, fallback string) string {
+	value, exists := os.LookupEnv(key)
+	if !exists {
+		return fallback
+	}
+	return value
+}
