@@ -15,9 +15,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-var expiryVerificationEmail = time.Now().Add(24 * time.Hour)
-var expiryResetPasswordEmail = time.Now().Add(15 * time.Minute)
-
 const pgUniqueViolationCode = "23505"
 
 type UserService struct {
@@ -66,7 +63,7 @@ func (u *UserService) Register(ctx context.Context, req model.RegisterUserReques
 		UserID:    createdUser.ID,
 		TokenHash: hashedToken,
 		ExpiresAt: pgtype.Timestamptz{
-			Time:  expiryVerificationEmail,
+			Time:  time.Now().Add(24 * time.Hour),
 			Valid: true,
 		},
 	})
@@ -216,6 +213,10 @@ func (u *UserService) ResendVerification(ctx context.Context, email string) erro
 		return fmt.Errorf("error in getting user by email: %w", err)
 	}
 
+	if existingUser.EmailVerifiedAt.Valid {
+		return fmt.Errorf("user is already verified")
+	}
+
 	randomString, err := security.GenerateRefreshToken()
 	if err != nil {
 		return fmt.Errorf("error in generatin random string token: %w", err)
@@ -226,7 +227,7 @@ func (u *UserService) ResendVerification(ctx context.Context, email string) erro
 		UserID:    existingUser.ID,
 		TokenHash: hashedToken,
 		ExpiresAt: pgtype.Timestamptz{
-			Time:  expiryVerificationEmail,
+			Time:  time.Now().Add(24 * time.Hour),
 			Valid: true,
 		},
 	})
@@ -259,7 +260,7 @@ func (u *UserService) ForgotPassword(ctx context.Context, email string) error {
 		UserID:    existingUser.ID,
 		TokenHash: hashedToken,
 		ExpiresAt: pgtype.Timestamptz{
-			Time:  expiryResetPasswordEmail,
+			Time:  time.Now().Add(15 * time.Minute),
 			Valid: true,
 		},
 	})

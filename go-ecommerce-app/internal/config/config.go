@@ -23,6 +23,8 @@ type Config struct {
 	ResendAPIKey        string
 	FrontendURL         string
 	ResendFromAddress   string
+	RedisAddr           string
+	RedisPassword       string
 }
 
 func NewConfig() (*Config, error) {
@@ -65,6 +67,8 @@ func NewConfig() (*Config, error) {
 		OrderSweepInterval:  orderSweepInterval,
 		OrderSweepThreshold: orderSweepThreshold,
 		FrontendURL:         getEnv("FRONTEND_URL", "http://localhost:5173"),
+		RedisAddr:           getEnv("REDIS_ADDR", "localhost:6379"),
+		RedisPassword:       getEnv("REDIS_PASSWORD", "myredispassword"),
 	}
 
 	var missing []string

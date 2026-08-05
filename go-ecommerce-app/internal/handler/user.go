@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-playground/validator"
+	"github.com/redis/go-redis/v9"
 )
 
 type UserHandler struct {
@@ -21,26 +22,32 @@ type UserHandler struct {
 	validate           *validator.Validate
 	jwtSecretKey       string
 	refreshTokenExpiry time.Duration
+	rdb                *redis.Client
 }
 
-func NewUserHandler(srv *service.UserService, secret string, refreshTokenExpiry time.Duration) *UserHandler {
+func NewUserHandler(srv *service.UserService, secret string, refreshTokenExpiry time.Duration, rdb *redis.Client) *UserHandler {
 	return &UserHandler{
 		srv:                srv,
 		validate:           validator.New(),
 		jwtSecretKey:       secret,
 		refreshTokenExpiry: refreshTokenExpiry,
+		rdb:                rdb,
 	}
 }
 
 func (u *UserHandler) UserRoutes(r chi.Router) {
 	r.Route("/users", func(r chi.Router) {
-		r.Post("/login", u.Login)
-		r.Post("/register", u.Register)
+		r.With(middleware.RateLimit(u.rdb, 5, 15*time.Minute, middleware.IPAndEmailKeyFunc("login"))).
+			Post("/login", u.Login)
+		r.With(middleware.RateLimit(u.rdb, 3, time.Hour, middleware.IPKeyFunc("register"))).
+			Post("/register", u.Register)
 		r.Post("/logout", u.Logout)
 		r.Post("/refresh", u.Refresh)
 		r.Post("/verify-email", u.VerifyEmail)
-		r.Post("/resend-verification", u.ResendVerification)
-		r.Post("/forgot-password", u.ForgotPassword)
+		r.With(middleware.RateLimit(u.rdb, 3, time.Hour, middleware.EmailKeyFunc("resend-verification"))).
+			Post("/resend-verification", u.ResendVerification)
+		r.With(middleware.RateLimit(u.rdb, 3, time.Hour, middleware.EmailKeyFunc("forgot-password"))).
+			Post("/forgot-password", u.ForgotPassword)
 		r.Post("/reset-password", u.ResetPassword)
 
 		r.Group(func(r chi.Router) {

@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -39,12 +40,23 @@ func main() {
 	}
 	defer dbPool.Close()
 
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     cfg.RedisAddr,
+		Password: cfg.RedisPassword,
+	})
+	defer rdb.Close()
+
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		slog.Error("redis", "error", err)
+		os.Exit(1)
+	}
+
 	senderEmail := email.NewResendClient(cfg.ResendAPIKey, cfg.ResendFromAddress, cfg.FrontendURL)
 
 	repo := repository.New(dbPool)
 
 	userService := service.NewUserService(repo, cfg, senderEmail)
-	userHandler := handler.NewUserHandler(userService, cfg.JWTSecret, cfg.RefreshTokenExpiry)
+	userHandler := handler.NewUserHandler(userService, cfg.JWTSecret, cfg.RefreshTokenExpiry, rdb)
 
 	r := chi.NewRouter()
 
