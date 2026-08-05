@@ -15,3 +15,8 @@ UPDATE users
 SET email_verified_at = now()
 WHERE id = $1
 RETURNING *;
+-- name: UpdatePasswordUser :one
+UPDATE users
+SET password_hash = $1
+WHERE id = $2
+RETURNING *;

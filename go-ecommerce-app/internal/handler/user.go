@@ -41,6 +41,7 @@ func (u *UserHandler) UserRoutes(r chi.Router) {
 		r.Post("/verify-email", u.VerifyEmail)
 		r.Post("/resend-verification", u.ResendVerification)
 		r.Post("/forgot-password", u.ForgotPassword)
+		r.Post("/reset-password", u.ResetPassword)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(u.jwtSecretKey))
@@ -352,6 +353,42 @@ func (u *UserHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		Success: true,
 		Data: map[string]string{
 			"message": "if that email exists, we sent a link",
+		},
+	}, http.StatusOK, w)
+}
+
+func (u *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+		var req model.ResetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Error("reset password", "error", err)
+		response.WriteErrorJSON("invalid request payload", http.StatusBadRequest, w)
+		return
+	}
+
+	if err := u.validate.Struct(req); err != nil {
+		slog.Error("reset password", "error", err)
+		response.WriteErrorJSON("invalid request payload", http.StatusBadRequest, w)
+		return
+	}
+	
+	
+	rawToken := r.URL.Query().Get("token")
+	if rawToken == "" {
+		slog.Error("reset password", "error", fmt.Errorf("invalid request url query of token"))
+		response.WriteErrorJSON("invalid or expired token", http.StatusUnauthorized, w)
+		return
+	}
+
+	if err := u.srv.ResetPassword(r.Context(), rawToken, req.Password); err != nil {
+		slog.Error("reset password", "error", err)
+		response.WriteErrorJSON("invalid or expired token", http.StatusUnauthorized, w)
+		return
+	}
+
+	response.WriteJSON(response.JSONResponse{
+		Success: true,
+		Data: map[string]any{
+			"message": "reset password successfully",
 		},
 	}, http.StatusOK, w)
 }

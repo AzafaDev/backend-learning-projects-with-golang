@@ -105,3 +105,31 @@ func (q *Queries) SetUserVerified(ctx context.Context, id pgtype.UUID) (User, er
 	)
 	return i, err
 }
+
+const updatePasswordUser = `-- name: UpdatePasswordUser :one
+UPDATE users
+SET password_hash = $1
+WHERE id = $2
+RETURNING id, full_name, email, password_hash, role, created_at, updated_at, email_verified_at
+`
+
+type UpdatePasswordUserParams struct {
+	PasswordHash string
+	ID           pgtype.UUID
+}
+
+func (q *Queries) UpdatePasswordUser(ctx context.Context, arg UpdatePasswordUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, updatePasswordUser, arg.PasswordHash, arg.ID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.FullName,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.EmailVerifiedAt,
+	)
+	return i, err
+}

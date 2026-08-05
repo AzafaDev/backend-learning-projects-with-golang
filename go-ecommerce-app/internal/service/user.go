@@ -268,8 +268,40 @@ func (u *UserService) ForgotPassword(ctx context.Context, email string) error {
 		return fmt.Errorf("error in creating verification email token: %w", err)
 	}
 
-	if err := u.email.SendVerificationEmail(ctx, existingUser.Email, randomString); err != nil {
+	if err := u.email.SendPasswordResetEmail(ctx, existingUser.Email, randomString); err != nil {
 		return fmt.Errorf("error in sending verification email: %w", err)
 	}
+	return nil
+}
+
+func (u *UserService) ResetPassword(ctx context.Context, rawToken, password string) error {
+	tokenHash := security.HashRefreshToken(rawToken)
+
+	exisitngPasswordToken, err := u.repo.GetResetPasswordTokenByTokenHash(ctx, tokenHash)
+	if err != nil {
+		return fmt.Errorf("error in getting email verification token: %w", err)
+	}
+
+	passwordHash, err := security.HashPassword(password)
+	if err != nil {
+		return fmt.Errorf("error in hashing password: %w", err)
+	}
+
+	_, err = u.repo.UpdatePasswordUser(ctx, repository.UpdatePasswordUserParams{
+		PasswordHash: passwordHash,
+		ID:           exisitngPasswordToken.UserID,
+	})
+	if err != nil {
+		return fmt.Errorf("error in updating password user: %w", err)
+	}
+
+	if err := u.repo.RevokeRefreshTokenByUserID(ctx, exisitngPasswordToken.UserID); err != nil {
+		return fmt.Errorf("error in revoking refresh token by user id: %w", err)
+	}
+
+	if err := u.repo.DeletePasswordTokenByTokenHash(ctx, exisitngPasswordToken.TokenHash); err != nil {
+		return fmt.Errorf("error in deleting pasword token: %w", err)
+	}
+
 	return nil
 }

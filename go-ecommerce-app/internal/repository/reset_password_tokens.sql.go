@@ -36,3 +36,32 @@ func (q *Queries) CreateResetPasswordToken(ctx context.Context, arg CreateResetP
 	)
 	return i, err
 }
+
+const deletePasswordTokenByTokenHash = `-- name: DeletePasswordTokenByTokenHash :exec
+DELETE FROM password_reset_tokens
+WHERE token_hash = $1
+`
+
+func (q *Queries) DeletePasswordTokenByTokenHash(ctx context.Context, tokenHash string) error {
+	_, err := q.db.Exec(ctx, deletePasswordTokenByTokenHash, tokenHash)
+	return err
+}
+
+const getResetPasswordTokenByTokenHash = `-- name: GetResetPasswordTokenByTokenHash :one
+SELECT id, user_id, token_hash, expires_at, created_at, updated_at FROM password_reset_tokens
+WHERE token_hash = $1 AND expires_at > now()
+`
+
+func (q *Queries) GetResetPasswordTokenByTokenHash(ctx context.Context, tokenHash string) (PasswordResetToken, error) {
+	row := q.db.QueryRow(ctx, getResetPasswordTokenByTokenHash, tokenHash)
+	var i PasswordResetToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
