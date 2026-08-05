@@ -32,6 +32,24 @@ func NewUserService(repo *repository.Queries, cfg *config.Config, email EmailSen
 	}
 }
 
+func toUserResponse(u repository.User) *model.UserResponse {
+	var emailVerifiedAt *time.Time
+	if u.EmailVerifiedAt.Valid {
+		t := u.EmailVerifiedAt.Time
+		emailVerifiedAt = &t
+	}
+
+	return &model.UserResponse{
+		ID:              u.ID.Bytes,
+		FullName:        u.FullName,
+		Email:           u.Email,
+		Role:            u.Role,
+		CreatedAt:       u.CreatedAt.Time,
+		UpdatedAt:       u.UpdatedAt.Time,
+		EmailVerifiedAt: emailVerifiedAt,
+	}
+}
+
 func (u *UserService) Register(ctx context.Context, req model.RegisterUserRequest) (*model.UserResponse, error) {
 	passwordHash, err := security.HashPassword(req.Password)
 	if err != nil {
@@ -77,14 +95,7 @@ func (u *UserService) Register(ctx context.Context, req model.RegisterUserReques
 		return nil, fmt.Errorf("error in sending verification email: %w", err)
 	}
 
-	return &model.UserResponse{
-		ID:        createdUser.ID.Bytes,
-		FullName:  createdUser.FullName,
-		Email:     createdUser.Email,
-		Role:      createdUser.Role,
-		CreatedAt: createdUser.CreatedAt.Time,
-		UpdatedAt: createdUser.UpdatedAt.Time,
-	}, nil
+	return toUserResponse(createdUser), nil
 }
 
 func (u *UserService) Login(ctx context.Context, req model.LoginUserRequest) (*model.UserResponse, string, string, error) {
@@ -131,14 +142,7 @@ func (u *UserService) Login(ctx context.Context, req model.LoginUserRequest) (*m
 
 	slog.Info("security_event", "event", "login_success", "user_id", existingUser.ID)
 
-	return &model.UserResponse{
-		ID:        existingUser.ID.Bytes,
-		FullName:  existingUser.FullName,
-		Email:     existingUser.Email,
-		Role:      existingUser.Role,
-		CreatedAt: existingUser.CreatedAt.Time,
-		UpdatedAt: existingUser.UpdatedAt.Time,
-	}, signedToken, rawToken, nil
+	return toUserResponse(existingUser), signedToken, rawToken, nil
 }
 
 func (u *UserService) Refresh(ctx context.Context, rawToken string) (string, string, error) {
@@ -208,14 +212,16 @@ func (u *UserService) UpdateRole(ctx context.Context, userID pgtype.UUID, role s
 		return nil, fmt.Errorf("error in updating user role: %w", err)
 	}
 
-	return &model.UserResponse{
-		ID:        updatedUser.ID.Bytes,
-		FullName:  updatedUser.FullName,
-		Email:     updatedUser.Email,
-		Role:      updatedUser.Role,
-		CreatedAt: updatedUser.CreatedAt.Time,
-		UpdatedAt: updatedUser.UpdatedAt.Time,
-	}, nil
+	return toUserResponse(updatedUser), nil
+}
+
+func (u *UserService) Me(ctx context.Context, userID pgtype.UUID) (*model.UserResponse, error) {
+	existingUser, err := u.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("error in getting user by id: %w", err)
+	}
+
+	return toUserResponse(existingUser), nil
 }
 
 func (u *UserService) LogoutAllDevices(ctx context.Context, userID pgtype.UUID) error {

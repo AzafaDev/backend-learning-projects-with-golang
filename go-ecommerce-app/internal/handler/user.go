@@ -25,15 +25,46 @@ type UserHandler struct {
 	jwtSecretKey       string
 	refreshTokenExpiry time.Duration
 	rdb                *redis.Client
+	env                string
 }
 
-func NewUserHandler(srv *service.UserService, secret string, refreshTokenExpiry time.Duration, rdb *redis.Client) *UserHandler {
+func NewUserHandler(srv *service.UserService, secret string, refreshTokenExpiry time.Duration, rdb *redis.Client, env string) *UserHandler {
 	return &UserHandler{
 		srv:                srv,
 		validate:           validator.New(),
 		jwtSecretKey:       secret,
 		refreshTokenExpiry: refreshTokenExpiry,
 		rdb:                rdb,
+		env:                env,
+	}
+}
+
+// refreshTokenCookie dan clearRefreshTokenCookie satu-satunya tempat yang
+// nentuin attribute cookie refresh_token, biar Login/Refresh/Logout nggak
+// bisa saling beda konfigurasi.
+func (u *UserHandler) refreshTokenCookie(value string) http.Cookie {
+	return http.Cookie{
+		Name:     "refresh_token",
+		Value:    value,
+		Path:     "/",
+		Expires:  time.Now().Add(u.refreshTokenExpiry),
+		MaxAge:   int(u.refreshTokenExpiry.Seconds()),
+		HttpOnly: true,
+		Secure:   u.env == "production",
+		SameSite: http.SameSiteLaxMode,
+	}
+}
+
+func (u *UserHandler) clearRefreshTokenCookie() http.Cookie {
+	return http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   u.env == "production",
+		SameSite: http.SameSiteLaxMode,
 	}
 }
 
@@ -121,17 +152,7 @@ func (u *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookie := http.Cookie{
-		Name:     "refresh_token",
-		Value:    refreshToken,
-		Path:     "/",
-		Expires:  time.Now().Add(u.refreshTokenExpiry),
-		MaxAge:   int(u.refreshTokenExpiry.Seconds()),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	}
-
+	cookie := u.refreshTokenCookie(refreshToken)
 	http.SetCookie(w, &cookie)
 
 	response.WriteJSON(response.JSONResponse{
@@ -165,17 +186,7 @@ func (u *UserHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookie := http.Cookie{
-		Name:     "refresh_token",
-		Value:    newRawRefreshToken,
-		Path:     "/",
-		Expires:  time.Now().Add(u.refreshTokenExpiry),
-		MaxAge:   int(u.refreshTokenExpiry.Seconds()),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	}
-
+	cookie := u.refreshTokenCookie(newRawRefreshToken)
 	http.SetCookie(w, &cookie)
 
 	response.WriteJSON(response.JSONResponse{
@@ -187,16 +198,7 @@ func (u *UserHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func (u *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	cookie := http.Cookie{
-		Name:     "refresh_token",
-		Value:    "",
-		Path:     "/",
-		Expires:  time.Unix(0, 0),
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	}
+	cookie := u.clearRefreshTokenCookie()
 	refreshTokenCookie, err := r.Cookie("refresh_token")
 	if err != nil {
 		slog.Error("refresh", "error", err)
@@ -251,11 +253,17 @@ func (u *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, err := u.srv.Me(r.Context(), pgtype.UUID{Bytes: claims.ID, Valid: true})
+	if err != nil {
+		slog.Error("me", "error", err)
+		response.WriteErrorJSON("something went wrong", http.StatusInternalServerError, w)
+		return
+	}
+
 	response.WriteJSON(response.JSONResponse{
 		Success: true,
 		Data: map[string]any{
-			"id":   claims.ID,
-			"role": claims.Role,
+			"user": user,
 		},
 	}, http.StatusOK, w)
 }
