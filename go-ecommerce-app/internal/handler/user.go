@@ -39,9 +39,6 @@ func NewUserHandler(srv *service.UserService, secret string, refreshTokenExpiry 
 	}
 }
 
-// refreshTokenCookie dan clearRefreshTokenCookie satu-satunya tempat yang
-// nentuin attribute cookie refresh_token, biar Login/Refresh/Logout nggak
-// bisa saling beda konfigurasi.
 func (u *UserHandler) refreshTokenCookie(value string) http.Cookie {
 	return http.Cookie{
 		Name:     "refresh_token",
@@ -86,6 +83,8 @@ func (u *UserHandler) UserRoutes(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(u.jwtSecretKey))
 			r.Get("/me", u.Me)
+			r.With(middleware.RateLimit(u.rdb, 5, 15*time.Minute, middleware.UserIDKeyFunc("change-password"))).
+				Post("/change-password", u.ChangePassword)
 			r.Post("/logout-all", u.LogoutAllDevices)
 			r.With(middleware.RequireRole("admin")).Patch("/{id}/role", u.UpdateRole)
 		})
@@ -377,7 +376,7 @@ func (u *UserHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (u *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
-		var req model.ResetPasswordRequest
+	var req model.ResetPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Error("reset password", "error", err)
 		response.WriteErrorJSON("invalid request payload", http.StatusBadRequest, w)
@@ -389,8 +388,7 @@ func (u *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		response.WriteErrorJSON("invalid request payload", http.StatusBadRequest, w)
 		return
 	}
-	
-	
+
 	rawToken := r.URL.Query().Get("token")
 	if rawToken == "" {
 		slog.Error("reset password", "error", fmt.Errorf("invalid request url query of token"))
@@ -464,6 +462,47 @@ func (u *UserHandler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 		Success: true,
 		Data: map[string]any{
 			"user": updatedUser,
+		},
+	}, http.StatusOK, w)
+}
+
+func (u *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	var req model.ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Error("change password", "error", err)
+		response.WriteErrorJSON("invalid payload request", http.StatusBadRequest, w)
+		return
+	}
+
+	if err := u.validate.Struct(req); err != nil {
+		slog.Error("change password", "error", err)
+		response.WriteErrorJSON("invalid payload request", http.StatusBadRequest, w)
+		return
+	}
+
+	claims, err := middleware.GetClaims(r.Context())
+	if err != nil {
+		slog.Error("change password", "error", err)
+		response.WriteErrorJSON("unauthorized", http.StatusBadRequest, w)
+		return
+	}
+
+	err = u.srv.ChangePassword(r.Context(), req, claims.ID)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidOldPassword) {
+			slog.Error("change password", "error", err)
+			response.WriteErrorJSON(err.Error(), http.StatusForbidden, w)
+			return
+		}
+		slog.Error("change password", "error", err)
+		response.WriteErrorJSON("something went wrong", http.StatusInternalServerError, w)
+		return
+	}
+
+	response.WriteJSON(response.JSONResponse{
+		Success: true,
+		Data: map[string]string{
+			"message": "changed password successfully",
 		},
 	}, http.StatusOK, w)
 }

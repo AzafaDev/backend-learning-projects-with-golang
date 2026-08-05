@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -19,12 +20,12 @@ import (
 const pgUniqueViolationCode = "23505"
 
 type UserService struct {
-	repo  *repository.Queries
+	repo  repository.Querier
 	cfg   *config.Config
 	email EmailSender
 }
 
-func NewUserService(repo *repository.Queries, cfg *config.Config, email EmailSender) *UserService {
+func NewUserService(repo repository.Querier, cfg *config.Config, email EmailSender) *UserService {
 	return &UserService{
 		repo:  repo,
 		cfg:   cfg,
@@ -355,6 +356,45 @@ func (u *UserService) ResetPassword(ctx context.Context, rawToken, password stri
 	}
 
 	slog.Info("security_event", "event", "password_reset_succeeded", "user_id", exisitngPasswordToken.UserID)
+
+	return nil
+}
+
+func (u *UserService) ChangePassword(ctx context.Context, req model.ChangePasswordRequest, userID uuid.UUID) error {
+
+	existingUser, err := u.repo.GetUserByID(ctx, pgtype.UUID{
+		Bytes: userID,
+		Valid: true,
+	})
+
+	if err != nil {
+		return fmt.Errorf("error in getting use by id: %w", err)
+	}
+
+	if err := security.ComparePassword(existingUser.PasswordHash, req.OldPassword); err != nil {
+		slog.Warn("security_event", "event", "change_password_failed", "reason", "invalid_old_password", "user_id", existingUser.ID)
+		return ErrInvalidOldPassword
+	}
+
+	newPasswordHash, err := security.HashPassword(req.NewPassword)
+	if err != nil {
+		return fmt.Errorf("error in hashing new password: %w", err)
+	}
+
+	updatedUser, err := u.repo.UpdatePasswordUser(ctx, repository.UpdatePasswordUserParams{
+		PasswordHash: newPasswordHash,
+		ID:           existingUser.ID,
+	})
+
+	if err != nil {
+		return fmt.Errorf("error in updating password user: %w", err)
+	}
+
+	if err := u.LogoutAllDevices(ctx, updatedUser.ID); err != nil {
+		return fmt.Errorf("error in logout all devices service method: %w", err)
+	}
+
+	slog.Info("security_event", "event", "password_changed", "user_id", updatedUser.ID)
 
 	return nil
 }
