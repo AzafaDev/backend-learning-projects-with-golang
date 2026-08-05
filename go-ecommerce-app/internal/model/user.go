@@ -37,3 +37,7 @@ type ForgotPasswordRequest struct {
 type ResetPasswordRequest struct {
 	Password string `json:"password" validate:"required,min=12"`
 }
+
+type UpdateRoleRequest struct {
+	Role string `json:"role" validate:"required,oneof=customer admin"`
+}

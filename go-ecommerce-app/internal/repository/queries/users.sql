@@ -20,3 +20,8 @@ UPDATE users
 SET password_hash = $1
 WHERE id = $2
 RETURNING *;
+-- name: UpdateUserRole :one
+UPDATE users
+SET role = $1
+WHERE id = $2
+RETURNING *;

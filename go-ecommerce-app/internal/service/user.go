@@ -8,6 +8,7 @@ import (
 	"go-ecommerce-app/internal/model"
 	"go-ecommerce-app/internal/repository"
 	"go-ecommerce-app/pkg/security"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -87,16 +88,21 @@ func (u *UserService) Register(ctx context.Context, req model.RegisterUserReques
 }
 
 func (u *UserService) Login(ctx context.Context, req model.LoginUserRequest) (*model.UserResponse, string, string, error) {
-	existingUser, err := u.repo.GetUserByEmail(ctx, req.Email)
+	trimEmail := strings.ToLower(strings.TrimSpace(req.Email))
+
+	existingUser, err := u.repo.GetUserByEmail(ctx, trimEmail)
 	if err != nil {
+		slog.Warn("security_event", "event", "login_failed", "reason", "invalid_credentials", "email", trimEmail)
 		return nil, "", "", fmt.Errorf("error in getting user by email: %w", err)
 	}
 
 	if err := security.ComparePassword(existingUser.PasswordHash, req.Password); err != nil {
+		slog.Warn("security_event", "event", "login_failed", "reason", "invalid_credentials", "email", trimEmail)
 		return nil, "", "", fmt.Errorf("error in comparing password: %w", err)
 	}
 
 	if !existingUser.EmailVerifiedAt.Valid {
+		slog.Warn("security_event", "event", "login_failed", "reason", "email_not_verified", "email", trimEmail)
 		return nil, "", "", ErrUserNotVerified
 	}
 
@@ -123,6 +129,8 @@ func (u *UserService) Login(ctx context.Context, req model.LoginUserRequest) (*m
 		return nil, "", "", fmt.Errorf("error in creating refresh token: %w", err)
 	}
 
+	slog.Info("security_event", "event", "login_success", "user_id", existingUser.ID)
+
 	return &model.UserResponse{
 		ID:        existingUser.ID.Bytes,
 		FullName:  existingUser.FullName,
@@ -138,6 +146,12 @@ func (u *UserService) Refresh(ctx context.Context, rawToken string) (string, str
 
 	existingRefreshToken, err := u.repo.GetRefreshToken(ctx, tokenHash)
 	if err != nil {
+		if anyToken, lookupErr := u.repo.GetRefreshTokenAnyStatus(ctx, tokenHash); lookupErr == nil && anyToken.RevokedAt.Valid {
+			slog.Error("security_event", "event", "refresh_token_reuse_detected", "user_id", anyToken.UserID)
+			if revokeErr := u.repo.RevokeRefreshTokenByUserID(ctx, anyToken.UserID); revokeErr != nil {
+				return "", "", fmt.Errorf("error in revoking refresh tokens after reuse detected: %w", revokeErr)
+			}
+		}
 		return "", "", fmt.Errorf("error in get refresh token: %w", err)
 	}
 
@@ -180,6 +194,33 @@ func (u *UserService) Logout(ctx context.Context, rawToken string) error {
 
 	if err := u.repo.RevokeRefreshToken(ctx, tokenHash); err != nil {
 		return fmt.Errorf("error in revoking refresh token: %w", err)
+	}
+
+	return nil
+}
+
+func (u *UserService) UpdateRole(ctx context.Context, userID pgtype.UUID, role string) (*model.UserResponse, error) {
+	updatedUser, err := u.repo.UpdateUserRole(ctx, repository.UpdateUserRoleParams{
+		Role: role,
+		ID:   userID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error in updating user role: %w", err)
+	}
+
+	return &model.UserResponse{
+		ID:        updatedUser.ID.Bytes,
+		FullName:  updatedUser.FullName,
+		Email:     updatedUser.Email,
+		Role:      updatedUser.Role,
+		CreatedAt: updatedUser.CreatedAt.Time,
+		UpdatedAt: updatedUser.UpdatedAt.Time,
+	}, nil
+}
+
+func (u *UserService) LogoutAllDevices(ctx context.Context, userID pgtype.UUID) error {
+	if err := u.repo.RevokeRefreshTokenByUserID(ctx, userID); err != nil {
+		return fmt.Errorf("error in revoking all refresh tokens: %w", err)
 	}
 
 	return nil
@@ -272,6 +313,9 @@ func (u *UserService) ForgotPassword(ctx context.Context, email string) error {
 	if err := u.email.SendPasswordResetEmail(ctx, existingUser.Email, randomString); err != nil {
 		return fmt.Errorf("error in sending verification email: %w", err)
 	}
+
+	slog.Info("security_event", "event", "password_reset_requested", "user_id", existingUser.ID)
+
 	return nil
 }
 
@@ -296,13 +340,15 @@ func (u *UserService) ResetPassword(ctx context.Context, rawToken, password stri
 		return fmt.Errorf("error in updating password user: %w", err)
 	}
 
-	if err := u.repo.RevokeRefreshTokenByUserID(ctx, exisitngPasswordToken.UserID); err != nil {
-		return fmt.Errorf("error in revoking refresh token by user id: %w", err)
+	if err := u.LogoutAllDevices(ctx, exisitngPasswordToken.UserID); err != nil {
+		return err
 	}
 
 	if err := u.repo.DeletePasswordTokenByTokenHash(ctx, exisitngPasswordToken.TokenHash); err != nil {
 		return fmt.Errorf("error in deleting pasword token: %w", err)
 	}
+
+	slog.Info("security_event", "event", "password_reset_succeeded", "user_id", exisitngPasswordToken.UserID)
 
 	return nil
 }

@@ -7,6 +7,10 @@ FROM refresh_tokens
 WHERE token_hash = $1
     AND expires_at > now()
     AND revoked_at IS NULL;
+-- name: GetRefreshTokenAnyStatus :one
+SELECT *
+FROM refresh_tokens
+WHERE token_hash = $1;
 -- name: RevokeRefreshTokenByUserID :exec
 UPDATE refresh_tokens
 SET revoked_at = now()

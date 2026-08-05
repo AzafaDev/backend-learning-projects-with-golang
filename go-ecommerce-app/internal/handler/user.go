@@ -14,6 +14,8 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-playground/validator"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -53,6 +55,8 @@ func (u *UserHandler) UserRoutes(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(u.jwtSecretKey))
 			r.Get("/me", u.Me)
+			r.Post("/logout-all", u.LogoutAllDevices)
+			r.With(middleware.RequireRole("admin")).Patch("/{id}/role", u.UpdateRole)
 		})
 	})
 }
@@ -396,6 +400,62 @@ func (u *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		Success: true,
 		Data: map[string]any{
 			"message": "reset password successfully",
+		},
+	}, http.StatusOK, w)
+}
+
+func (u *UserHandler) LogoutAllDevices(w http.ResponseWriter, r *http.Request) {
+	claims, err := middleware.GetClaims(r.Context())
+	if err != nil {
+		response.WriteErrorJSON("unauthorized", http.StatusUnauthorized, w)
+		return
+	}
+
+	if err := u.srv.LogoutAllDevices(r.Context(), pgtype.UUID{Bytes: claims.ID, Valid: true}); err != nil {
+		slog.Error("logout all devices", "error", err)
+		response.WriteErrorJSON("something went wrong", http.StatusInternalServerError, w)
+		return
+	}
+
+	response.WriteJSON(response.JSONResponse{
+		Success: true,
+		Data: map[string]any{
+			"message": "logged out from all devices",
+		},
+	}, http.StatusOK, w)
+}
+
+func (u *UserHandler) UpdateRole(w http.ResponseWriter, r *http.Request) {
+	targetID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteErrorJSON("invalid user id", http.StatusBadRequest, w)
+		return
+	}
+
+	var req model.UpdateRoleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Error("update role", "error", err)
+		response.WriteErrorJSON("invalid request payload", http.StatusBadRequest, w)
+		return
+	}
+
+	if err := u.validate.Struct(req); err != nil {
+		slog.Error("update role", "error", err)
+		response.WriteErrorJSON("invalid request payload", http.StatusBadRequest, w)
+		return
+	}
+
+	updatedUser, err := u.srv.UpdateRole(r.Context(), pgtype.UUID{Bytes: targetID, Valid: true}, req.Role)
+	if err != nil {
+		slog.Error("update role", "error", err)
+		response.WriteErrorJSON("something went wrong", http.StatusInternalServerError, w)
+		return
+	}
+
+	response.WriteJSON(response.JSONResponse{
+		Success: true,
+		Data: map[string]any{
+			"user": updatedUser,
 		},
 	}, http.StatusOK, w)
 }
